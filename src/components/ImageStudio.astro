@@ -27,9 +27,10 @@ const t = useTranslations(locale);
     <div class="workspace" hidden data-workspace>
       <div class="preview-card">
         <div class="visual-editor" data-stage>
-          <div class="canvas-frame" data-frame>
-            <canvas data-canvas aria-label={t('editor.previewLabel')}></canvas>
-            <div class="resize-box" data-resize-box>
+          <div class="image-frame" data-frame>
+            <img class="preview-img" data-preview alt={t('editor.previewLabel')} />
+            <canvas data-canvas hidden></canvas>
+            <div class="resize-box">
               <button type="button" class="handle nw" data-resize="nw" aria-label={t('editor.resizeHandle')}></button>
               <button type="button" class="handle ne" data-resize="ne" aria-label={t('editor.resizeHandle')}></button>
               <button type="button" class="handle sw" data-resize="sw" aria-label={t('editor.resizeHandle')}></button>
@@ -54,25 +55,15 @@ const t = useTranslations(locale);
           <label><span>{t('editor.format')}</span><select data-format><option value="image/png">PNG</option><option value="image/jpeg">JPG</option><option value="image/webp">WebP</option></select></label>
           <label><span>{t('editor.quality')}</span><input type="range" min="0.4" max="1" step="0.05" value="0.85" data-quality /></label>
         </fieldset>
-
         <fieldset>
           <legend>{t('editor.visualTools')}</legend>
-          <div class="button-row">
-            <button type="button" class="btn btn-secondary" data-crop-toggle>{t('editor.crop')}</button>
-            <button type="button" class="btn btn-secondary" data-apply-crop disabled>{t('editor.applyCrop')}</button>
-          </div>
+          <div class="button-row"><button type="button" class="btn btn-secondary" data-crop-toggle>{t('editor.crop')}</button><button type="button" class="btn btn-secondary" data-apply-crop disabled>{t('editor.applyCrop')}</button></div>
           <p class="help-text">{t('editor.visualToolsHelp')}</p>
         </fieldset>
-
         <fieldset>
           <legend>{t('editor.transforms')}</legend>
-          <div class="button-row">
-            <button type="button" class="btn btn-secondary" data-rotate>{t('editor.rotate')}</button>
-            <button type="button" class="btn btn-secondary" data-flip-x>{t('editor.flipX')}</button>
-            <button type="button" class="btn btn-secondary" data-flip-y>{t('editor.flipY')}</button>
-          </div>
+          <div class="button-row"><button type="button" class="btn btn-secondary" data-rotate>{t('editor.rotate')}</button><button type="button" class="btn btn-secondary" data-flip-x>{t('editor.flipX')}</button><button type="button" class="btn btn-secondary" data-flip-y>{t('editor.flipY')}</button></div>
         </fieldset>
-
         <fieldset>
           <legend>{t('editor.filters')}</legend>
           <label><span>{t('editor.brightness')}</span><input type="range" min="50" max="150" value="100" data-brightness /></label>
@@ -81,12 +72,10 @@ const t = useTranslations(locale);
           <label><span>{t('editor.blur')}</span><input type="range" min="0" max="8" step="0.5" value="0" data-blur /></label>
           <div class="button-row"><button type="button" class="btn btn-secondary" data-grayscale>{t('editor.grayscale')}</button><button type="button" class="btn btn-secondary" data-sepia>{t('editor.sepia')}</button></div>
         </fieldset>
-
         <fieldset>
           <legend>{t('editor.watermark')}</legend>
           <label><span>{t('editor.watermarkText')}</span><input type="text" maxlength="48" data-watermark placeholder={t('editor.watermarkPlaceholder')} /></label>
         </fieldset>
-
         <div class="action-row"><button type="button" class="btn btn-primary" data-download>{t('editor.download')}</button><button type="button" class="btn btn-ghost" data-reset>{t('editor.reset')}</button></div>
         <p class="privacy-note">{t('editor.privacy')}</p>
       </form>
@@ -100,12 +89,12 @@ const t = useTranslations(locale);
       const root = document.querySelector('[data-image-studio]');
       if (!root || root.dataset.ready) return;
       root.dataset.ready = '1';
-
       const input = root.querySelector('[data-file-input]');
       const dropzone = root.querySelector('[data-dropzone]');
       const workspace = root.querySelector('[data-workspace]');
       const stage = root.querySelector('[data-stage]');
       const frame = root.querySelector('[data-frame]');
+      const preview = root.querySelector('[data-preview]');
       const canvas = root.querySelector('[data-canvas]');
       const cropBox = root.querySelector('[data-crop-box]');
       const meta = root.querySelector('[data-file-meta]');
@@ -113,67 +102,31 @@ const t = useTranslations(locale);
       const cropToggle = root.querySelector('[data-crop-toggle]');
       const applyCrop = root.querySelector('[data-apply-crop]');
       const ctx = canvas && canvas.getContext('2d');
-      if (!input || !dropzone || !workspace || !stage || !frame || !canvas || !cropBox || !meta || !hint || !cropToggle || !applyCrop || !ctx) return;
+      if (!input || !dropzone || !workspace || !stage || !frame || !preview || !canvas || !cropBox || !meta || !hint || !cropToggle || !applyCrop || !ctx) return;
 
-      const MAX_CANVAS_SIDE = 4096;
-      const MAX_CANVAS_PIXELS = 12000000;
-      const state = { image: null, source: null, name: 'facilimg', originalW: 0, originalH: 0, w: 0, h: 0, rotate: 0, flipX: 1, flipY: 1, gray: false, sepia: false, cropOn: false, crop: { x: 12, y: 12, w: 76, h: 76 } };
+      const MAX_SIDE = 4096;
+      const MAX_PIXELS = 12000000;
+      const state = { img: null, objectUrl: '', name: 'facilimg', originalW: 0, originalH: 0, w: 0, h: 0, rotate: 0, flipX: 1, flipY: 1, gray: false, sepia: false, cropOn: false, crop: { x: 12, y: 12, w: 76, h: 76 } };
       const $ = (s) => root.querySelector(s);
       const clamp = (n, min, max) => Math.min(Math.max(n, min), max);
+      const safeSize = (w, h) => { const s = Math.min(1, MAX_SIDE / Math.max(w, h), Math.sqrt(MAX_PIXELS / Math.max(1, w * h))); return { w: Math.max(1, Math.round(w * s)), h: Math.max(1, Math.round(h * s)) }; };
+      const outputSize = () => state.rotate % 180 === 0 ? { w: state.w, h: state.h } : { w: state.h, h: state.w };
+      const filters = () => `brightness(${$('[data-brightness]').value}%) contrast(${$('[data-contrast]').value}%) saturate(${$('[data-saturation]').value}%) blur(${$('[data-blur]').value}px)` + (state.gray ? ' grayscale(100%)' : '') + (state.sepia ? ' sepia(100%)' : '');
       const baseHint = hint.textContent;
       const cropHint = 'Mueve la caja de recorte o arrastra sus esquinas. Después pulsa aplicar recorte.';
 
-      function nameOf(file) { return file.name.replace(/\.[^.]+$/, '').replace(/[^a-z0-9-_]+/gi, '-') || 'facilimg'; }
-      function safeSize(w, h) {
-        const sideScale = Math.min(1, MAX_CANVAS_SIDE / Math.max(w, h));
-        const pixelScale = Math.min(1, Math.sqrt(MAX_CANVAS_PIXELS / Math.max(1, w * h)));
-        const scale = Math.min(sideScale, pixelScale);
-        return { w: Math.max(1, Math.round(w * scale)), h: Math.max(1, Math.round(h * scale)) };
-      }
-      function makeSource(img) {
-        const naturalW = img.naturalWidth || 1;
-        const naturalH = img.naturalHeight || 1;
-        const size = safeSize(naturalW, naturalH);
-        const c = document.createElement('canvas');
-        c.width = size.w; c.height = size.h;
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        return c;
-      }
-      function filters() { return `brightness(${$('[data-brightness]').value}%) contrast(${$('[data-contrast]').value}%) saturate(${$('[data-saturation]').value}%) blur(${$('[data-blur]').value}px)` + (state.gray ? ' grayscale(100%)' : '') + (state.sepia ? ' sepia(100%)' : ''); }
-
-      function draw(target, watermark = true) {
-        if (!state.source) return;
-        const safe = safeSize(state.w, state.h);
-        if (safe.w !== state.w || safe.h !== state.h) { state.w = safe.w; state.h = safe.h; }
-        const cx = target.getContext('2d');
-        const rotated = state.rotate % 180 !== 0;
-        target.width = rotated ? state.h : state.w;
-        target.height = rotated ? state.w : state.h;
-        cx.clearRect(0, 0, target.width, target.height);
-        cx.save();
-        cx.translate(target.width / 2, target.height / 2);
-        cx.rotate((state.rotate * Math.PI) / 180);
-        cx.scale(state.flipX, state.flipY);
-        cx.filter = filters();
-        cx.drawImage(state.source, -state.w / 2, -state.h / 2, state.w, state.h);
-        cx.restore();
-        const text = $('[data-watermark]').value.trim();
-        if (watermark && text) {
-          const size = Math.max(18, Math.round(target.width / 28));
-          cx.save(); cx.font = `700 ${size}px system-ui,sans-serif`; cx.textAlign = 'right'; cx.textBaseline = 'bottom';
-          cx.fillStyle = 'rgba(0,0,0,.55)'; cx.fillText(text, target.width - 22, target.height - 20);
-          cx.fillStyle = 'rgba(255,255,255,.86)'; cx.fillText(text, target.width - 24, target.height - 22); cx.restore();
-        }
-      }
-
+      function fileName(file) { return file.name.replace(/\.[^.]+$/, '').replace(/[^a-z0-9-_]+/gi, '-') || 'facilimg'; }
+      function setPreviewUrl(url) { preview.src = url; }
       function fit() {
+        const out = outputSize();
         const maxW = Math.max(260, stage.clientWidth - 32);
         const maxH = Math.max(220, Math.min(window.innerHeight * 0.64, 720));
-        const scale = Math.min(1, maxW / canvas.width, maxH / canvas.height) || 1;
-        frame.style.width = `${Math.max(1, Math.round(canvas.width * scale))}px`;
-        frame.style.height = `${Math.max(1, Math.round(canvas.height * scale))}px`;
+        const scale = Math.min(1, maxW / out.w, maxH / out.h) || 1;
+        frame.style.width = `${Math.max(1, Math.round(out.w * scale))}px`;
+        frame.style.height = `${Math.max(1, Math.round(out.h * scale))}px`;
+        preview.style.transform = `translate(-50%, -50%) rotate(${state.rotate}deg) scale(${state.flipX}, ${state.flipY})`;
+        preview.style.filter = filters();
       }
-
       function syncCrop() {
         cropBox.hidden = !state.cropOn;
         applyCrop.disabled = !state.cropOn;
@@ -181,35 +134,42 @@ const t = useTranslations(locale);
         hint.textContent = state.cropOn ? cropHint : baseHint;
         cropBox.style.left = `${state.crop.x}%`; cropBox.style.top = `${state.crop.y}%`; cropBox.style.width = `${state.crop.w}%`; cropBox.style.height = `${state.crop.h}%`;
       }
+      function render() { if (!state.img) return; fit(); syncCrop(); const out = outputSize(); meta.textContent = `${state.originalW}×${state.originalH}px → ${out.w}×${out.h}px`; }
 
-      function render() { if (!state.source) return; draw(canvas); fit(); syncCrop(); meta.textContent = `${state.originalW}×${state.originalH}px → ${canvas.width}×${canvas.height}px`; }
-
-      function load(file) {
-        if (!file || !file.type.startsWith('image/')) return;
-        const url = URL.createObjectURL(file);
+      function draw(target, watermark = true) {
+        if (!state.img) return;
+        const safe = safeSize(state.w, state.h); state.w = safe.w; state.h = safe.h;
+        const out = outputSize();
+        target.width = out.w; target.height = out.h;
+        const cx = target.getContext('2d');
+        cx.clearRect(0, 0, target.width, target.height);
+        cx.save(); cx.translate(target.width / 2, target.height / 2); cx.rotate((state.rotate * Math.PI) / 180); cx.scale(state.flipX, state.flipY); cx.filter = filters();
+        cx.drawImage(state.img, -state.w / 2, -state.h / 2, state.w, state.h); cx.restore();
+        const text = $('[data-watermark]').value.trim();
+        if (watermark && text) { const size = Math.max(18, Math.round(target.width / 28)); cx.save(); cx.font = `700 ${size}px system-ui,sans-serif`; cx.textAlign = 'right'; cx.textBaseline = 'bottom'; cx.fillStyle = 'rgba(0,0,0,.55)'; cx.fillText(text, target.width - 22, target.height - 20); cx.fillStyle = 'rgba(255,255,255,.86)'; cx.fillText(text, target.width - 24, target.height - 22); cx.restore(); }
+      }
+      function loadUrl(url, name, revokePrevious = true) {
         const img = new Image();
         img.onload = () => {
-          try {
-            state.image = img; state.source = makeSource(img); state.name = nameOf(file);
-            state.originalW = img.naturalWidth || state.source.width; state.originalH = img.naturalHeight || state.source.height; state.w = state.source.width; state.h = state.source.height;
-            state.rotate = 0; state.flipX = 1; state.flipY = 1; state.gray = false; state.sepia = false; state.cropOn = false; state.crop = { x: 12, y: 12, w: 76, h: 76 };
-            workspace.hidden = false; input.value = ''; render();
-          } catch (e) { console.error(e); meta.textContent = 'No se pudo cargar esta imagen.'; }
-          URL.revokeObjectURL(url);
+          if (revokePrevious && state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+          state.img = img; state.objectUrl = url; state.name = name || state.name;
+          state.originalW = img.naturalWidth; state.originalH = img.naturalHeight;
+          const safe = safeSize(img.naturalWidth, img.naturalHeight); state.w = safe.w; state.h = safe.h;
+          state.rotate = 0; state.flipX = 1; state.flipY = 1; state.gray = false; state.sepia = false; state.cropOn = false; state.crop = { x: 12, y: 12, w: 76, h: 76 };
+          setPreviewUrl(url); workspace.hidden = false; input.value = ''; render();
         };
-        img.onerror = () => { URL.revokeObjectURL(url); meta.textContent = 'No se pudo cargar esta imagen.'; };
+        img.onerror = () => { meta.textContent = 'No se pudo cargar esta imagen.'; };
         img.src = url;
       }
-
-      function scaleInfo() { const r = frame.getBoundingClientRect(); return { r, sx: canvas.width / Math.max(1, r.width), sy: canvas.height / Math.max(1, r.height) }; }
+      function load(file) { if (!file || !file.type.startsWith('image/')) return; loadUrl(URL.createObjectURL(file), fileName(file)); }
+      function scaleInfo() { const r = frame.getBoundingClientRect(); return { r, sx: outputSize().w / Math.max(1, r.width), sy: outputSize().h / Math.max(1, r.height) }; }
       function resizeStart(ev, corner) {
-        if (!state.source) return; ev.preventDefault();
+        if (!state.img) return; ev.preventDefault();
         const start = { x: ev.clientX, y: ev.clientY, w: state.w, h: state.h }; const ratio = start.w / start.h; const s = scaleInfo();
-        const move = (e) => { const dx = (e.clientX - start.x) * s.sx * (corner.includes('w') ? -1 : 1); const dy = (e.clientY - start.y) * s.sy * (corner.includes('n') ? -1 : 1); let nw = start.w + dx; let nh = start.h + dy; if (Math.abs(dx) > Math.abs(dy)) nh = nw / ratio; else nw = nh * ratio; const safe = safeSize(clamp(nw, 32, MAX_CANVAS_SIDE), clamp(nh, 32, MAX_CANVAS_SIDE)); state.w = safe.w; state.h = safe.h; render(); };
+        const move = (e) => { const dx = (e.clientX - start.x) * s.sx * (corner.includes('w') ? -1 : 1); const dy = (e.clientY - start.y) * s.sy * (corner.includes('n') ? -1 : 1); let nw = start.w + dx; let nh = start.h + dy; if (Math.abs(dx) > Math.abs(dy)) nh = nw / ratio; else nw = nh * ratio; const safe = safeSize(clamp(nw, 32, MAX_SIDE), clamp(nh, 32, MAX_SIDE)); state.w = safe.w; state.h = safe.h; render(); };
         const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
         window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
       }
-
       function cropStart(ev, mode) {
         if (!state.cropOn) return; ev.preventDefault(); ev.stopPropagation();
         const start = { x: ev.clientX, y: ev.clientY, crop: { ...state.crop } }; const { r } = scaleInfo();
@@ -220,12 +180,11 @@ const t = useTranslations(locale);
         const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
         window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
       }
-
       function doCrop() {
-        if (!state.cropOn || !state.source) return; const tmp = document.createElement('canvas'); draw(tmp, false);
-        const sx = Math.round(state.crop.x / 100 * tmp.width), sy = Math.round(state.crop.y / 100 * tmp.height), sw = Math.round(state.crop.w / 100 * tmp.width), sh = Math.round(state.crop.h / 100 * tmp.height);
+        if (!state.cropOn || !state.img) return; const tmp = document.createElement('canvas'); draw(tmp, false);
+        const sx = Math.round(state.crop.x / 100 * tmp.width), sy = Math.round(state.crop.y / 100 * tmp.height), sw = Math.max(1, Math.round(state.crop.w / 100 * tmp.width)), sh = Math.max(1, Math.round(state.crop.h / 100 * tmp.height));
         const out = document.createElement('canvas'); out.width = sw; out.height = sh; out.getContext('2d').drawImage(tmp, sx, sy, sw, sh, 0, 0, sw, sh);
-        state.source = out; state.originalW = sw; state.originalH = sh; state.w = sw; state.h = sh; state.rotate = 0; state.flipX = 1; state.flipY = 1; state.cropOn = false; state.crop = { x: 12, y: 12, w: 76, h: 76 }; render();
+        loadUrl(out.toDataURL('image/png'), `${state.name}-recorte`, false);
       }
 
       input.addEventListener('change', () => load(input.files?.[0]));
@@ -243,8 +202,8 @@ const t = useTranslations(locale);
       $('[data-flip-y]').addEventListener('click', () => { state.flipY *= -1; render(); });
       $('[data-grayscale]').addEventListener('click', () => { state.gray = !state.gray; render(); });
       $('[data-sepia]').addEventListener('click', () => { state.sepia = !state.sepia; render(); });
-      $('[data-reset]').addEventListener('click', () => { if (!state.image) return; state.source = makeSource(state.image); state.originalW = state.image.naturalWidth || state.source.width; state.originalH = state.image.naturalHeight || state.source.height; state.w = state.source.width; state.h = state.source.height; state.rotate = 0; state.flipX = 1; state.flipY = 1; state.gray = false; state.sepia = false; state.cropOn = false; render(); });
-      $('[data-download]').addEventListener('click', () => { if (!state.source) return; const format = $('[data-format]').value; const q = Number($('[data-quality]').value); canvas.toBlob((blob) => { if (!blob) return; const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${state.name}-facilimg.${format.split('/')[1].replace('jpeg','jpg')}`; a.click(); URL.revokeObjectURL(url); }, format, q); });
+      $('[data-reset]').addEventListener('click', () => { if (!state.img || !state.objectUrl) return; const safe = safeSize(state.originalW, state.originalH); state.w = safe.w; state.h = safe.h; state.rotate = 0; state.flipX = 1; state.flipY = 1; state.gray = false; state.sepia = false; state.cropOn = false; render(); });
+      $('[data-download]').addEventListener('click', () => { if (!state.img) return; const format = $('[data-format]').value; const q = Number($('[data-quality]').value); draw(canvas, true); canvas.toBlob((blob) => { if (!blob) return; const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${state.name}-facilimg.${format.split('/')[1].replace('jpeg','jpg')}`; a.click(); URL.revokeObjectURL(url); }, format, q); });
       window.addEventListener('resize', render);
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
@@ -252,5 +211,5 @@ const t = useTranslations(locale);
 </script>
 
 <style>
-  .image-studio,.workspace,.controls{display:grid;gap:var(--space-5)}.image-studio{margin-block:var(--space-16)}.studio-copy{max-width:48rem}.studio-copy h2{margin:0;font-size:clamp(2rem,5vw,3rem);line-height:1.05;letter-spacing:-.04em}.studio-copy p:last-child{color:var(--color-text-muted);font-size:1.08rem}.studio-panel,.preview-card,fieldset{border:1px solid var(--color-border);background:var(--color-surface)}.studio-panel{border-radius:var(--radius-2xl);box-shadow:var(--shadow-md);padding:var(--space-4)}.dropzone{position:relative;border:2px dashed var(--color-border-strong);border-radius:var(--radius-xl);background:linear-gradient(135deg,var(--color-primary-soft),transparent 55%),var(--color-surface-soft)}.dropzone.is-dragging{border-color:var(--color-primary);transform:scale(1.01)}.dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer}.dropzone label{min-height:13rem;display:grid;place-items:center;gap:.35rem;text-align:center;padding:var(--space-8);cursor:pointer}.dropzone-icon{display:grid;place-items:center;width:3.5rem;height:3.5rem;border-radius:var(--radius-xl);background:var(--color-primary);color:white;font-size:1.6rem}.preview-card{border-radius:var(--radius-xl);padding:var(--space-4);background:var(--color-surface-soft)}.visual-editor{display:grid;place-items:center;min-height:18rem;overflow:auto;border-radius:var(--radius-xl);padding:var(--space-4);background:repeating-conic-gradient(color-mix(in srgb,var(--color-border),transparent 20%) 0 25%,transparent 0 50%) 50%/1.2rem 1.2rem}.canvas-frame{position:relative;display:inline-block;touch-action:none}canvas{display:block;width:100%;height:100%;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);background:var(--color-surface)}.resize-box{position:absolute;inset:0;border:2px solid var(--color-primary);border-radius:var(--radius-lg);pointer-events:none}.handle{position:absolute;width:1.15rem;height:1.15rem;border:2px solid white;border-radius:999px;background:var(--color-primary);box-shadow:var(--shadow-sm);pointer-events:auto}.nw{left:-.6rem;top:-.6rem;cursor:nwse-resize}.ne{right:-.6rem;top:-.6rem;cursor:nesw-resize}.sw{left:-.6rem;bottom:-.6rem;cursor:nesw-resize}.se{right:-.6rem;bottom:-.6rem;cursor:nwse-resize}.crop-box{position:absolute;border:2px solid white;background:rgb(14 165 233/.16);box-shadow:0 0 0 9999px rgb(2 6 23/.48),0 0 0 1px var(--color-primary);cursor:move;touch-action:none}.crop-grid{position:absolute;inset:0;background:linear-gradient(90deg,transparent 33%,rgb(255 255 255/.7) 33% 34%,transparent 34% 66%,rgb(255 255 255/.7) 66% 67%,transparent 67%),linear-gradient(0deg,transparent 33%,rgb(255 255 255/.7) 33% 34%,transparent 34% 66%,rgb(255 255 255/.7) 66% 67%,transparent 67%);pointer-events:none}.file-meta,.visual-hint,.help-text,.privacy-note{margin:0;color:var(--color-text-soft);font-size:.92rem}fieldset{border-radius:var(--radius-xl);padding:var(--space-4)}legend{font-weight:800;padding-inline:.35rem}label{display:grid;gap:.45rem;margin-top:.8rem;font-weight:700}input,select{min-height:2.75rem;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);color:var(--color-text);padding:.7rem .85rem;font:inherit}input[type=range]{padding-inline:0}.button-row,.action-row{display:grid;gap:.75rem}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:2.75rem;border-radius:var(--radius-lg);border:1px solid transparent;padding:.75rem 1rem;font-weight:800;cursor:pointer}.btn:disabled{cursor:not-allowed;opacity:.48}.btn-primary{background:var(--color-primary);color:white}.btn-secondary{background:var(--color-surface-soft);color:var(--color-text);border-color:var(--color-border)}.btn-secondary.is-active{border-color:var(--color-primary);background:var(--color-primary-soft)}.btn-ghost{background:transparent;color:var(--color-text-muted)}@media (min-width:760px){.workspace{grid-template-columns:minmax(0,1.15fr) minmax(20rem,.85fr);align-items:start}.button-row,.action-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .image-studio,.workspace,.controls{display:grid;gap:var(--space-5)}.image-studio{margin-block:var(--space-16)}.studio-copy{max-width:48rem}.studio-copy h2{margin:0;font-size:clamp(2rem,5vw,3rem);line-height:1.05;letter-spacing:-.04em}.studio-copy p:last-child{color:var(--color-text-muted);font-size:1.08rem}.studio-panel,.preview-card,fieldset{border:1px solid var(--color-border);background:var(--color-surface)}.studio-panel{border-radius:var(--radius-2xl);box-shadow:var(--shadow-md);padding:var(--space-4)}.dropzone{position:relative;border:2px dashed var(--color-border-strong);border-radius:var(--radius-xl);background:linear-gradient(135deg,var(--color-primary-soft),transparent 55%),var(--color-surface-soft)}.dropzone.is-dragging{border-color:var(--color-primary);transform:scale(1.01)}.dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer}.dropzone label{min-height:13rem;display:grid;place-items:center;gap:.35rem;text-align:center;padding:var(--space-8);cursor:pointer}.dropzone-icon{display:grid;place-items:center;width:3.5rem;height:3.5rem;border-radius:var(--radius-xl);background:var(--color-primary);color:white;font-size:1.6rem}.preview-card{border-radius:var(--radius-xl);padding:var(--space-4);background:var(--color-surface-soft)}.visual-editor{display:grid;place-items:center;min-height:18rem;overflow:auto;border-radius:var(--radius-xl);padding:var(--space-4);background:repeating-conic-gradient(color-mix(in srgb,var(--color-border),transparent 20%) 0 25%,transparent 0 50%) 50%/1.2rem 1.2rem}.image-frame{position:relative;display:inline-block;overflow:hidden;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);background:var(--color-surface);touch-action:none}.preview-img{position:absolute;left:50%;top:50%;width:100%;height:100%;object-fit:fill;display:block;transform-origin:center}.resize-box{position:absolute;inset:0;border:2px solid var(--color-primary);border-radius:var(--radius-lg);pointer-events:none}.handle{position:absolute;width:1.15rem;height:1.15rem;border:2px solid white;border-radius:999px;background:var(--color-primary);box-shadow:var(--shadow-sm);pointer-events:auto}.nw{left:-.6rem;top:-.6rem;cursor:nwse-resize}.ne{right:-.6rem;top:-.6rem;cursor:nesw-resize}.sw{left:-.6rem;bottom:-.6rem;cursor:nesw-resize}.se{right:-.6rem;bottom:-.6rem;cursor:nwse-resize}.crop-box{position:absolute;border:2px solid white;background:rgb(14 165 233/.16);box-shadow:0 0 0 9999px rgb(2 6 23/.48),0 0 0 1px var(--color-primary);cursor:move;touch-action:none}.crop-grid{position:absolute;inset:0;background:linear-gradient(90deg,transparent 33%,rgb(255 255 255/.7) 33% 34%,transparent 34% 66%,rgb(255 255 255/.7) 66% 67%,transparent 67%),linear-gradient(0deg,transparent 33%,rgb(255 255 255/.7) 33% 34%,transparent 34% 66%,rgb(255 255 255/.7) 66% 67%,transparent 67%);pointer-events:none}.file-meta,.visual-hint,.help-text,.privacy-note{margin:0;color:var(--color-text-soft);font-size:.92rem}fieldset{border-radius:var(--radius-xl);padding:var(--space-4)}legend{font-weight:800;padding-inline:.35rem}label{display:grid;gap:.45rem;margin-top:.8rem;font-weight:700}input,select{min-height:2.75rem;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);color:var(--color-text);padding:.7rem .85rem;font:inherit}input[type=range]{padding-inline:0}.button-row,.action-row{display:grid;gap:.75rem}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:2.75rem;border-radius:var(--radius-lg);border:1px solid transparent;padding:.75rem 1rem;font-weight:800;cursor:pointer}.btn:disabled{cursor:not-allowed;opacity:.48}.btn-primary{background:var(--color-primary);color:white}.btn-secondary{background:var(--color-surface-soft);color:var(--color-text);border-color:var(--color-border)}.btn-secondary.is-active{border-color:var(--color-primary);background:var(--color-primary-soft)}.btn-ghost{background:transparent;color:var(--color-text-muted)}@media (min-width:760px){.workspace{grid-template-columns:minmax(0,1.15fr) minmax(20rem,.85fr);align-items:start}.button-row,.action-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
