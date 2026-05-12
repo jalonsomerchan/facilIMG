@@ -1,0 +1,305 @@
+---
+import type { Locale } from '../config/site';
+import { useTranslations } from '../i18n/ui';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = useTranslations(locale);
+---
+
+<section id="editor" class="image-studio" aria-labelledby="editor-title">
+  <div class="studio-copy">
+    <p class="section-kicker">{t('editor.eyebrow')}</p>
+    <h2 id="editor-title">{t('editor.title')}</h2>
+    <p>{t('editor.description')}</p>
+  </div>
+
+  <div class="studio-panel" data-image-studio>
+    <div class="dropzone" data-dropzone>
+      <input id="image-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" data-file-input />
+      <label for="image-input">
+        <span class="dropzone-icon" aria-hidden="true">✦</span>
+        <strong>{t('editor.dropTitle')}</strong>
+        <span>{t('editor.dropText')}</span>
+      </label>
+    </div>
+
+    <div class="workspace" hidden data-workspace>
+      <div class="preview-card">
+        <canvas data-canvas aria-label={t('editor.previewLabel')}></canvas>
+        <p class="file-meta" data-file-meta>{t('editor.emptyMeta')}</p>
+      </div>
+
+      <form class="controls" data-controls>
+        <fieldset>
+          <legend>{t('editor.output')}</legend>
+          <label>
+            <span>{t('editor.format')}</span>
+            <select data-format>
+              <option value="image/png">PNG</option>
+              <option value="image/jpeg">JPG</option>
+              <option value="image/webp">WebP</option>
+            </select>
+          </label>
+          <label>
+            <span>{t('editor.quality')}</span>
+            <input type="range" min="0.4" max="1" step="0.05" value="0.85" data-quality />
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>{t('editor.size')}</legend>
+          <div class="control-grid">
+            <label><span>{t('editor.width')}</span><input type="number" min="1" data-width /></label>
+            <label><span>{t('editor.height')}</span><input type="number" min="1" data-height /></label>
+          </div>
+          <label class="checkbox"><input type="checkbox" checked data-lock-ratio /> {t('editor.lockRatio')}</label>
+        </fieldset>
+
+        <fieldset>
+          <legend>{t('editor.transforms')}</legend>
+          <div class="button-row">
+            <button type="button" class="btn btn-secondary" data-rotate>{t('editor.rotate')}</button>
+            <button type="button" class="btn btn-secondary" data-flip-x>{t('editor.flipX')}</button>
+            <button type="button" class="btn btn-secondary" data-flip-y>{t('editor.flipY')}</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>{t('editor.filters')}</legend>
+          <label><span>{t('editor.brightness')}</span><input type="range" min="50" max="150" value="100" data-brightness /></label>
+          <label><span>{t('editor.contrast')}</span><input type="range" min="50" max="150" value="100" data-contrast /></label>
+          <label><span>{t('editor.saturation')}</span><input type="range" min="0" max="200" value="100" data-saturation /></label>
+          <label><span>{t('editor.blur')}</span><input type="range" min="0" max="8" step="0.5" value="0" data-blur /></label>
+          <div class="button-row">
+            <button type="button" class="btn btn-secondary" data-grayscale>{t('editor.grayscale')}</button>
+            <button type="button" class="btn btn-secondary" data-sepia>{t('editor.sepia')}</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>{t('editor.watermark')}</legend>
+          <label><span>{t('editor.watermarkText')}</span><input type="text" maxlength="48" data-watermark placeholder={t('editor.watermarkPlaceholder')} /></label>
+        </fieldset>
+
+        <div class="action-row">
+          <button type="button" class="btn btn-primary" data-download>{t('editor.download')}</button>
+          <button type="button" class="btn btn-ghost" data-reset>{t('editor.reset')}</button>
+        </div>
+        <p class="privacy-note">{t('editor.privacy')}</p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<script is:inline>
+  (() => {
+    const root = document.querySelector('[data-image-studio]');
+    if (!root) return;
+
+    const input = root.querySelector('[data-file-input]');
+    const dropzone = root.querySelector('[data-dropzone]');
+    const workspace = root.querySelector('[data-workspace]');
+    const canvas = root.querySelector('[data-canvas]');
+    const meta = root.querySelector('[data-file-meta]');
+    const ctx = canvas.getContext('2d');
+
+    const state = {
+      image: null,
+      name: 'facilimg',
+      originalWidth: 0,
+      originalHeight: 0,
+      width: 0,
+      height: 0,
+      rotate: 0,
+      flipX: 1,
+      flipY: 1,
+      grayscale: false,
+      sepia: false,
+    };
+
+    const $ = (selector) => root.querySelector(selector);
+    const widthInput = $('[data-width]');
+    const heightInput = $('[data-height]');
+    const ratioInput = $('[data-lock-ratio]');
+    const controls = root.querySelectorAll('input, select');
+
+    function fileBaseName(name) {
+      return name.replace(/\.[^.]+$/, '').replace(/[^a-z0-9-_]+/gi, '-').replace(/^-|-$/g, '') || 'facilimg';
+    }
+
+    function readImage(file) {
+      if (!file || !file.type.startsWith('image/')) return;
+      const url = URL.createObjectURL(file);
+      const image = new Image();
+      image.onload = () => {
+        URL.revokeObjectURL(url);
+        state.image = image;
+        state.name = fileBaseName(file.name);
+        state.originalWidth = image.naturalWidth;
+        state.originalHeight = image.naturalHeight;
+        state.width = image.naturalWidth;
+        state.height = image.naturalHeight;
+        state.rotate = 0;
+        state.flipX = 1;
+        state.flipY = 1;
+        state.grayscale = false;
+        state.sepia = false;
+        widthInput.value = state.width;
+        heightInput.value = state.height;
+        workspace.hidden = false;
+        render();
+      };
+      image.src = url;
+    }
+
+    function filterValue() {
+      const parts = [
+        `brightness(${$('[data-brightness]').value}%)`,
+        `contrast(${$('[data-contrast]').value}%)`,
+        `saturate(${$('[data-saturation]').value}%)`,
+        `blur(${$('[data-blur]').value}px)`,
+      ];
+      if (state.grayscale) parts.push('grayscale(100%)');
+      if (state.sepia) parts.push('sepia(100%)');
+      return parts.join(' ');
+    }
+
+    function render() {
+      if (!state.image) return;
+      const rotated = state.rotate % 180 !== 0;
+      canvas.width = rotated ? state.height : state.width;
+      canvas.height = rotated ? state.width : state.height;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((state.rotate * Math.PI) / 180);
+      ctx.scale(state.flipX, state.flipY);
+      ctx.filter = filterValue();
+      ctx.drawImage(state.image, -state.width / 2, -state.height / 2, state.width, state.height);
+      ctx.restore();
+
+      const watermark = $('[data-watermark]').value.trim();
+      if (watermark) {
+        const fontSize = Math.max(18, Math.round(canvas.width / 28));
+        ctx.save();
+        ctx.font = `700 ${fontSize}px system-ui, sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle = 'rgba(0,0,0,.55)';
+        ctx.fillText(watermark, canvas.width - 24, canvas.height - 22);
+        ctx.fillStyle = 'rgba(255,255,255,.86)';
+        ctx.fillText(watermark, canvas.width - 26, canvas.height - 24);
+        ctx.restore();
+      }
+
+      meta.textContent = `${state.originalWidth}×${state.originalHeight}px → ${canvas.width}×${canvas.height}px`;
+    }
+
+    function setWidth(value) {
+      state.width = Math.max(1, Number(value) || state.originalWidth);
+      if (ratioInput.checked) {
+        state.height = Math.max(1, Math.round((state.width * state.originalHeight) / state.originalWidth));
+        heightInput.value = state.height;
+      }
+      render();
+    }
+
+    function setHeight(value) {
+      state.height = Math.max(1, Number(value) || state.originalHeight);
+      if (ratioInput.checked) {
+        state.width = Math.max(1, Math.round((state.height * state.originalWidth) / state.originalHeight));
+        widthInput.value = state.width;
+      }
+      render();
+    }
+
+    input.addEventListener('change', () => readImage(input.files?.[0]));
+    dropzone.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      dropzone.classList.add('is-dragging');
+    });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('is-dragging'));
+    dropzone.addEventListener('drop', (event) => {
+      event.preventDefault();
+      dropzone.classList.remove('is-dragging');
+      readImage(event.dataTransfer?.files?.[0]);
+    });
+
+    widthInput.addEventListener('input', () => setWidth(widthInput.value));
+    heightInput.addEventListener('input', () => setHeight(heightInput.value));
+    root.querySelectorAll('[data-quality], [data-format], [data-brightness], [data-contrast], [data-saturation], [data-blur], [data-watermark]').forEach((el) => el.addEventListener('input', render));
+    $('[data-rotate]').addEventListener('click', () => { state.rotate = (state.rotate + 90) % 360; render(); });
+    $('[data-flip-x]').addEventListener('click', () => { state.flipX *= -1; render(); });
+    $('[data-flip-y]').addEventListener('click', () => { state.flipY *= -1; render(); });
+    $('[data-grayscale]').addEventListener('click', () => { state.grayscale = !state.grayscale; render(); });
+    $('[data-sepia]').addEventListener('click', () => { state.sepia = !state.sepia; render(); });
+    $('[data-reset]').addEventListener('click', () => {
+      controls.forEach((control) => {
+        if (control.type === 'range') control.value = control.defaultValue;
+        if (control.type === 'text') control.value = '';
+      });
+      state.width = state.originalWidth;
+      state.height = state.originalHeight;
+      state.rotate = 0;
+      state.flipX = 1;
+      state.flipY = 1;
+      state.grayscale = false;
+      state.sepia = false;
+      widthInput.value = state.width;
+      heightInput.value = state.height;
+      render();
+    });
+    $('[data-download]').addEventListener('click', () => {
+      if (!state.image) return;
+      const format = $('[data-format]').value;
+      const quality = Number($('[data-quality]').value);
+      const extension = format.split('/')[1].replace('jpeg', 'jpg');
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${state.name}-facilimg.${extension}`;
+        link.click();
+        URL.revokeObjectURL(url);
+      }, format, quality);
+    });
+  })();
+</script>
+
+<style>
+  .image-studio { display: grid; gap: var(--space-6); margin-block: var(--space-16); }
+  .studio-copy { max-width: 48rem; }
+  .studio-copy h2 { margin: 0; font-size: clamp(2rem, 5vw, 3rem); line-height: 1.05; letter-spacing: -0.04em; }
+  .studio-copy p:last-child { color: var(--color-text-muted); font-size: 1.08rem; }
+  .studio-panel { border: 1px solid var(--color-border); border-radius: var(--radius-2xl); background: var(--color-surface); box-shadow: var(--shadow-md); padding: var(--space-4); }
+  .dropzone { position: relative; border: 2px dashed var(--color-border-strong); border-radius: var(--radius-xl); background: linear-gradient(135deg, var(--color-primary-soft), transparent 55%), var(--color-surface-soft); transition: border-color var(--transition-base), transform var(--transition-base); }
+  .dropzone.is-dragging { border-color: var(--color-primary); transform: scale(1.01); }
+  .dropzone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .dropzone label { min-height: 13rem; display: grid; place-items: center; gap: .35rem; text-align: center; padding: var(--space-8); cursor: pointer; }
+  .dropzone-icon { display: grid; place-items: center; width: 3.5rem; height: 3.5rem; border-radius: var(--radius-xl); background: var(--color-primary); color: white; font-size: 1.6rem; box-shadow: var(--shadow-sm); }
+  .dropzone span:last-child, .privacy-note, .file-meta { color: var(--color-text-soft); }
+  .workspace { display: grid; gap: var(--space-5); margin-top: var(--space-5); }
+  .preview-card { display: grid; gap: var(--space-3); align-content: start; border: 1px solid var(--color-border); border-radius: var(--radius-xl); padding: var(--space-4); background: var(--color-surface-soft); }
+  canvas { width: 100%; max-height: 64vh; object-fit: contain; border-radius: var(--radius-lg); background: repeating-conic-gradient(var(--color-border) 0 25%, transparent 0 50%) 50% / 1.2rem 1.2rem; }
+  .controls { display: grid; gap: var(--space-4); }
+  fieldset { border: 1px solid var(--color-border); border-radius: var(--radius-xl); padding: var(--space-4); background: var(--color-surface); }
+  legend { padding-inline: .35rem; font-weight: 800; }
+  label { display: grid; gap: .45rem; margin-top: .8rem; font-weight: 700; }
+  input, select { min-height: 2.75rem; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); color: var(--color-text); padding: .7rem .85rem; font: inherit; }
+  input[type='range'] { padding-inline: 0; }
+  .checkbox { display: flex; align-items: center; gap: .55rem; color: var(--color-text-muted); }
+  .checkbox input { min-height: auto; }
+  .control-grid, .button-row, .action-row { display: grid; gap: .75rem; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; border-radius: var(--radius-lg); border: 1px solid transparent; padding: .75rem 1rem; font-weight: 800; cursor: pointer; transition: transform var(--transition-fast), background var(--transition-base), border-color var(--transition-base); }
+  .btn:hover { transform: translateY(-1px); }
+  .btn-primary { background: var(--color-primary); color: white; }
+  .btn-secondary { background: var(--color-surface-soft); color: var(--color-text); border-color: var(--color-border); }
+  .btn-ghost { background: transparent; color: var(--color-text-muted); }
+  .privacy-note { margin: 0; font-size: .92rem; }
+  @media (min-width: 760px) { .workspace { grid-template-columns: minmax(0, 1.15fr) minmax(20rem, .85fr); align-items: start; } .control-grid, .button-row, .action-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+</style>
