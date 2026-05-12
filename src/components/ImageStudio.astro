@@ -115,6 +115,8 @@ const t = useTranslations(locale);
       const ctx = canvas && canvas.getContext('2d');
       if (!input || !dropzone || !workspace || !stage || !frame || !canvas || !cropBox || !meta || !hint || !cropToggle || !applyCrop || !ctx) return;
 
+      const MAX_CANVAS_SIDE = 4096;
+      const MAX_CANVAS_PIXELS = 12000000;
       const state = { image: null, source: null, name: 'facilimg', originalW: 0, originalH: 0, w: 0, h: 0, rotate: 0, flipX: 1, flipY: 1, gray: false, sepia: false, cropOn: false, crop: { x: 12, y: 12, w: 76, h: 76 } };
       const $ = (s) => root.querySelector(s);
       const clamp = (n, min, max) => Math.min(Math.max(n, min), max);
@@ -122,11 +124,27 @@ const t = useTranslations(locale);
       const cropHint = 'Mueve la caja de recorte o arrastra sus esquinas. Después pulsa aplicar recorte.';
 
       function nameOf(file) { return file.name.replace(/\.[^.]+$/, '').replace(/[^a-z0-9-_]+/gi, '-') || 'facilimg'; }
-      function makeSource(img) { const c = document.createElement('canvas'); c.width = img.naturalWidth || 1; c.height = img.naturalHeight || 1; c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c; }
+      function safeSize(w, h) {
+        const sideScale = Math.min(1, MAX_CANVAS_SIDE / Math.max(w, h));
+        const pixelScale = Math.min(1, Math.sqrt(MAX_CANVAS_PIXELS / Math.max(1, w * h)));
+        const scale = Math.min(sideScale, pixelScale);
+        return { w: Math.max(1, Math.round(w * scale)), h: Math.max(1, Math.round(h * scale)) };
+      }
+      function makeSource(img) {
+        const naturalW = img.naturalWidth || 1;
+        const naturalH = img.naturalHeight || 1;
+        const size = safeSize(naturalW, naturalH);
+        const c = document.createElement('canvas');
+        c.width = size.w; c.height = size.h;
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        return c;
+      }
       function filters() { return `brightness(${$('[data-brightness]').value}%) contrast(${$('[data-contrast]').value}%) saturate(${$('[data-saturation]').value}%) blur(${$('[data-blur]').value}px)` + (state.gray ? ' grayscale(100%)' : '') + (state.sepia ? ' sepia(100%)' : ''); }
 
       function draw(target, watermark = true) {
         if (!state.source) return;
+        const safe = safeSize(state.w, state.h);
+        if (safe.w !== state.w || safe.h !== state.h) { state.w = safe.w; state.h = safe.h; }
         const cx = target.getContext('2d');
         const rotated = state.rotate % 180 !== 0;
         target.width = rotated ? state.h : state.w;
@@ -173,7 +191,7 @@ const t = useTranslations(locale);
         img.onload = () => {
           try {
             state.image = img; state.source = makeSource(img); state.name = nameOf(file);
-            state.originalW = state.source.width; state.originalH = state.source.height; state.w = state.source.width; state.h = state.source.height;
+            state.originalW = img.naturalWidth || state.source.width; state.originalH = img.naturalHeight || state.source.height; state.w = state.source.width; state.h = state.source.height;
             state.rotate = 0; state.flipX = 1; state.flipY = 1; state.gray = false; state.sepia = false; state.cropOn = false; state.crop = { x: 12, y: 12, w: 76, h: 76 };
             workspace.hidden = false; input.value = ''; render();
           } catch (e) { console.error(e); meta.textContent = 'No se pudo cargar esta imagen.'; }
@@ -187,7 +205,7 @@ const t = useTranslations(locale);
       function resizeStart(ev, corner) {
         if (!state.source) return; ev.preventDefault();
         const start = { x: ev.clientX, y: ev.clientY, w: state.w, h: state.h }; const ratio = start.w / start.h; const s = scaleInfo();
-        const move = (e) => { const dx = (e.clientX - start.x) * s.sx * (corner.includes('w') ? -1 : 1); const dy = (e.clientY - start.y) * s.sy * (corner.includes('n') ? -1 : 1); let nw = start.w + dx; let nh = start.h + dy; if (Math.abs(dx) > Math.abs(dy)) nh = nw / ratio; else nw = nh * ratio; state.w = Math.round(clamp(nw, 32, 8000)); state.h = Math.round(clamp(nh, 32, 8000)); render(); };
+        const move = (e) => { const dx = (e.clientX - start.x) * s.sx * (corner.includes('w') ? -1 : 1); const dy = (e.clientY - start.y) * s.sy * (corner.includes('n') ? -1 : 1); let nw = start.w + dx; let nh = start.h + dy; if (Math.abs(dx) > Math.abs(dy)) nh = nw / ratio; else nw = nh * ratio; const safe = safeSize(clamp(nw, 32, MAX_CANVAS_SIDE), clamp(nh, 32, MAX_CANVAS_SIDE)); state.w = safe.w; state.h = safe.h; render(); };
         const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
         window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
       }
@@ -225,7 +243,7 @@ const t = useTranslations(locale);
       $('[data-flip-y]').addEventListener('click', () => { state.flipY *= -1; render(); });
       $('[data-grayscale]').addEventListener('click', () => { state.gray = !state.gray; render(); });
       $('[data-sepia]').addEventListener('click', () => { state.sepia = !state.sepia; render(); });
-      $('[data-reset]').addEventListener('click', () => { if (!state.image) return; state.source = makeSource(state.image); state.originalW = state.source.width; state.originalH = state.source.height; state.w = state.source.width; state.h = state.source.height; state.rotate = 0; state.flipX = 1; state.flipY = 1; state.gray = false; state.sepia = false; state.cropOn = false; render(); });
+      $('[data-reset]').addEventListener('click', () => { if (!state.image) return; state.source = makeSource(state.image); state.originalW = state.image.naturalWidth || state.source.width; state.originalH = state.image.naturalHeight || state.source.height; state.w = state.source.width; state.h = state.source.height; state.rotate = 0; state.flipX = 1; state.flipY = 1; state.gray = false; state.sepia = false; state.cropOn = false; render(); });
       $('[data-download]').addEventListener('click', () => { if (!state.source) return; const format = $('[data-format]').value; const q = Number($('[data-quality]').value); canvas.toBlob((blob) => { if (!blob) return; const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${state.name}-facilimg.${format.split('/')[1].replace('jpeg','jpg')}`; a.click(); URL.revokeObjectURL(url); }, format, q); });
       window.addEventListener('resize', render);
     }
