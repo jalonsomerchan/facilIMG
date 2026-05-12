@@ -87,6 +87,8 @@ npm ci
 └── tests/smoke.test.mjs
 ```
 
+La configuración principal del sitio está en `src/config/site.ts`.
+
 ## Documentación para agentes IA
 
 Antes de modificar este proyecto, una IA debe leer:
