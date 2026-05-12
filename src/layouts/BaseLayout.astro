@@ -23,8 +23,9 @@ const description = Astro.props.description ?? t('site.description');
 const pageTitle = title === siteConfig.name ? title : `${title} · ${siteConfig.name}`;
 const basePath = import.meta.env.BASE_URL ?? siteConfig.base;
 const withBase = (path: string) => `${basePath.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+const withVersion = (path: string) => `${withBase(path)}?v=${siteConfig.version}`;
 const canonicalUrl = new URL(Astro.url.pathname, siteConfig.url).toString();
-const imageUrl = new URL(withBase(image), siteConfig.url).toString();
+const imageUrl = new URL(withVersion(image), siteConfig.url).toString();
 const ogLocale = locale === 'es' ? 'es_ES' : 'en_US';
 const structuredData = {
   '@context': 'https://schema.org',
@@ -34,29 +35,50 @@ const structuredData = {
   applicationCategory: 'UtilitiesApplication',
   operatingSystem: 'Any',
   description,
+  softwareVersion: siteConfig.version,
 };
 ---
 
 <!doctype html>
-<html lang={locale}>
+<html lang={locale} data-app-version={siteConfig.version}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
-    <script is:inline>
+    <meta name="app-version" content={siteConfig.version} />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <script is:inline define:vars={{ appVersion: siteConfig.version }}>
       (() => {
-        const stored = localStorage.getItem('theme');
+        const key = 'facilimg:app-version';
+        const current = appVersion;
+        const storedVersion = localStorage.getItem(key);
+        const refreshKey = `${key}:refreshed:${current}`;
+
+        if (storedVersion && storedVersion !== current && sessionStorage.getItem(refreshKey) !== '1') {
+          localStorage.setItem(key, current);
+          sessionStorage.setItem(refreshKey, '1');
+          const url = new URL(window.location.href);
+          url.searchParams.set('v', current);
+          window.location.replace(url.toString());
+          return;
+        }
+
+        localStorage.setItem(key, current);
+
+        const storedTheme = localStorage.getItem('theme');
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        document.documentElement.dataset.theme = stored || (prefersDark ? 'dark' : 'light');
+        document.documentElement.dataset.theme = storedTheme || (prefersDark ? 'dark' : 'light');
       })();
     </script>
     <title>{pageTitle}</title>
     <meta name="description" content={description} />
     <meta name="robots" content="index,follow" />
     <link rel="canonical" href={canonicalUrl} />
-    <link rel="icon" type="image/svg+xml" href={withBase('favicon.svg')} />
-    <link rel="icon" href={withBase('favicon.ico')} />
-    <link rel="manifest" href={withBase('manifest.webmanifest')} />
+    <link rel="icon" type="image/svg+xml" href={withVersion('favicon.svg')} />
+    <link rel="icon" href={withVersion('favicon.ico')} />
+    <link rel="manifest" href={withVersion('manifest.webmanifest')} />
     <meta property="og:type" content="website" />
     <meta property="og:title" content={pageTitle} />
     <meta property="og:description" content={description} />
