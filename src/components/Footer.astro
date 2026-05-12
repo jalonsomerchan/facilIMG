@@ -1,7 +1,6 @@
 ---
-import Container from './Container.astro';
 import { siteConfig, type Locale } from '../config/site';
-import { useTranslations } from '../i18n/ui';
+import { getLocalizedPath, useTranslations } from '../i18n/ui';
 
 interface Props {
   locale: Locale;
@@ -9,10 +8,52 @@ interface Props {
 
 const { locale } = Astro.props;
 const t = useTranslations(locale);
+const homeUrl = getLocalizedPath('/', locale);
+const year = new Date().getFullYear();
 ---
 
-<footer class="border-t border-[var(--color-border)]">
-  <Container class="py-6 text-sm text-[var(--color-muted)]">
-    <p>© {new Date().getFullYear()} {siteConfig.name}. {t('footer.createdWith')}</p>
-  </Container>
+<footer class="site-footer">
+  <div class="site-footer__inner">
+    <section class="footer-brand" aria-label={siteConfig.name}>
+      <a class="brand footer-brand__logo" href={homeUrl}>
+        <span class="brand__mark" aria-hidden="true">IMG</span>
+        <strong>{siteConfig.name}</strong>
+      </a>
+      <p>{t('footer.createdWith')}</p>
+      <ul class="trust-badges" aria-label="Ventajas">
+        <li><span aria-hidden="true">🔒</span>{t('home.privacyBadge')}</li>
+        <li><span aria-hidden="true">⚡</span>Frontend</li>
+        <li><span aria-hidden="true">🖼️</span>{t('home.formatsBadge')}</li>
+      </ul>
+    </section>
+
+    <nav class="footer-column" aria-label="Herramientas">
+      <h2>{t('nav.tools')}</h2>
+      <a href={`${homeUrl}#editor`}>{t('home.primaryCta')}</a>
+      <a href={`${homeUrl}#tools`}>{t('tools.convert.title')}</a>
+      <a href={`${homeUrl}#tools`}>{t('tools.resize.title')}</a>
+      <a href={`${homeUrl}#tools`}>{t('tools.filters.title')}</a>
+    </nav>
+
+    <nav class="footer-column" aria-label="Proyecto">
+      <h2>Proyecto</h2>
+      <a href={homeUrl}>{t('nav.home')}</a>
+      <a href={`${homeUrl}#faq`}>{t('nav.faq')}</a>
+      <a href="https://github.com/jalonsomerchan/facilIMG" rel="noreferrer">GitHub</a>
+      <a href="https://github.com/jalonsomerchan/facilIMG#readme" rel="noreferrer">README</a>
+    </nav>
+
+    <section class="footer-privacy-card" aria-labelledby="footer-privacy-title">
+      <span aria-hidden="true">🔒</span>
+      <div>
+        <h2 id="footer-privacy-title">{t('home.privacyBadge')}</h2>
+        <p>{t('editor.privacy')}</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="site-footer__bottom">
+    <p>© {year} {siteConfig.name}. Todos los derechos reservados.</p>
+    <p>{siteConfig.author}</p>
+  </div>
 </footer>
