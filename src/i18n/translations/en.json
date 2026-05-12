@@ -42,6 +42,7 @@
   "editor.visualTools": "Visual tools",
   "editor.visualToolsHelp": "Resize by dragging the image corners. To crop, enable crop mode and move or resize the box over the preview.",
   "editor.visualHint": "Drag the blue corner handles to resize visually.",
+  "editor.cropHint": "Move the crop box or drag its corners. Then press apply crop.",
   "editor.resizeHandle": "Resize image by dragging",
   "editor.cropHandle": "Adjust crop by dragging",
   "editor.crop": "Crop visually",
