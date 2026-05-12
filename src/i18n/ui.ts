@@ -4,7 +4,9 @@ import es from './translations/es.json';
 
 export type TranslationKey = keyof typeof es;
 
-const translations: Record<Locale, typeof es> = {
+type TranslationMap = Record<string, string>;
+
+const translations: Record<Locale, TranslationMap> = {
   es,
   en,
 };
@@ -35,7 +37,7 @@ export function getLocaleFromUrl(pathname: string): Locale {
 }
 
 export function useTranslations(locale: Locale) {
-  return function t(key: TranslationKey): string {
+  return function t(key: string): string {
     return translations[locale]?.[key] ?? translations[defaultLocale][key] ?? key;
   };
 }
