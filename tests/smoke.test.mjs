@@ -45,6 +45,7 @@ describe('project smoke checks', () => {
   it('keeps the expected npm scripts available', () => {
     const pkg = readJson('package.json');
 
+    assert.equal(pkg.name, 'facilimg');
     assert.equal(pkg.scripts?.dev, 'astro dev');
     assert.equal(pkg.scripts?.build, 'astro build');
     assert.equal(pkg.scripts?.preview, 'astro preview');
@@ -53,7 +54,7 @@ describe('project smoke checks', () => {
   });
 
   it('keeps basic template components available', () => {
-    ['Button', 'Container', 'Footer', 'Header'].forEach((component) => {
+    ['Button', 'Container', 'Footer', 'Header', 'ImageStudio'].forEach((component) => {
       assert.equal(
         existsSync(join(root, `src/components/${component}.astro`)),
         true,
@@ -80,6 +81,19 @@ describe('project smoke checks', () => {
     assert.deepEqual(Object.keys(en).sort(), Object.keys(es).sort());
     assert.ok(es['home.title']);
     assert.ok(en['home.title']);
+    assert.ok(es['editor.download']);
+    assert.ok(en['editor.download']);
+  });
+
+  it('includes the browser image editor on both home pages', () => {
+    const home = readText('src/pages/index.astro');
+    const localizedHome = readText('src/pages/[locale]/index.astro');
+    const studio = readText('src/components/ImageStudio.astro');
+
+    assert.match(home, /ImageStudio/);
+    assert.match(localizedHome, /ImageStudio/);
+    assert.match(studio, /canvas/);
+    assert.match(studio, /toBlob/);
   });
 
   it('includes GitHub workflows for CI and Pages', () => {

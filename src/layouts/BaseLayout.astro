@@ -26,6 +26,15 @@ const withBase = (path: string) => `${basePath.replace(/\/$/, '')}/${path.replac
 const canonicalUrl = new URL(Astro.url.pathname, siteConfig.url).toString();
 const imageUrl = new URL(withBase(image), siteConfig.url).toString();
 const ogLocale = locale === 'es' ? 'es_ES' : 'en_US';
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'WebApplication',
+  name: siteConfig.name,
+  url: canonicalUrl,
+  applicationCategory: 'UtilitiesApplication',
+  operatingSystem: 'Any',
+  description,
+};
 ---
 
 <!doctype html>
@@ -34,8 +43,16 @@ const ogLocale = locale === 'es' ? 'es_ES' : 'en_US';
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
+    <script is:inline>
+      (() => {
+        const stored = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.dataset.theme = stored || (prefersDark ? 'dark' : 'light');
+      })();
+    </script>
     <title>{pageTitle}</title>
     <meta name="description" content={description} />
+    <meta name="robots" content="index,follow" />
     <link rel="canonical" href={canonicalUrl} />
     <link rel="icon" type="image/svg+xml" href={withBase('favicon.svg')} />
     <link rel="icon" href={withBase('favicon.ico')} />
@@ -50,10 +67,12 @@ const ogLocale = locale === 'es' ? 'es_ES' : 'en_US';
     <meta name="twitter:title" content={pageTitle} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={imageUrl} />
+    <script type="application/ld+json" set:html={JSON.stringify(structuredData)}></script>
   </head>
   <body>
+    <a class="skip-link" href="#main">Saltar al contenido</a>
     <Header locale={locale} />
-    <main>
+    <main id="main">
       <slot />
     </main>
     <Footer locale={locale} />

@@ -9,8 +9,9 @@ export const localeLabels: Record<Locale, string> = {
 };
 
 export const siteConfig = {
-  name: 'Astro Template',
-  description: 'Plantilla base para crear proyectos con Astro.',
+  name: 'FácilIMG',
+  description:
+    'Herramientas online para editar, convertir y optimizar imágenes directamente en el navegador.',
   url: import.meta.env.ASTRO_SITE ?? 'https://jalonsomerchan.github.io',
   base: import.meta.env.ASTRO_BASE ?? '/',
   author: 'Jorge Alonso',

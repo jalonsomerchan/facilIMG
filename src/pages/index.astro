@@ -1,25 +1,101 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import Button from '../components/Button.astro';
 import Container from '../components/Container.astro';
-import { defaultLocale, siteConfig } from '../config/site';
+import ImageStudio from '../components/ImageStudio.astro';
+import { defaultLocale } from '../config/site';
 import { useTranslations } from '../i18n/ui';
 
 const locale = defaultLocale;
 const t = useTranslations(locale);
+
+const tools = [
+  ['convert', '🖼️'],
+  ['resize', '📐'],
+  ['transform', '🔄'],
+  ['filters', '✨'],
+  ['watermark', '©'],
+  ['front', '🔒'],
+] as const;
 ---
 
-<BaseLayout title={siteConfig.name} description={t('site.description')} locale={locale}>
-  <Container class="py-20">
-    <section class="mx-auto max-w-3xl text-center">
-      <p class="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-[var(--color-primary)]">{t('home.eyebrow')}</p>
-      <h1 class="text-4xl font-black tracking-tight sm:text-6xl">{t('home.title')}</h1>
-      <p class="mx-auto mt-6 max-w-2xl text-lg text-[var(--color-muted)]">
-        {t('home.description')}
-      </p>
-      <div class="mt-8 flex flex-wrap justify-center gap-3">
-        <Button href="https://docs.astro.build/">{t('home.docs')}</Button>
-        <Button href="https://github.com/jalonsomerchan/astro-template" variant="secondary">{t('home.repository')}</Button>
+<BaseLayout title="Editor de imágenes online" description={t('site.description')} locale={locale}>
+  <Container class="py-14 sm:py-20">
+    <section class="hero-grid">
+      <div class="hero-copy">
+        <p class="section-kicker">{t('home.eyebrow')}</p>
+        <h1>{t('home.title')}</h1>
+        <p>{t('home.description')}</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#editor">{t('home.primaryCta')}</a>
+          <a class="btn btn-secondary" href="#tools">{t('home.secondaryCta')}</a>
+        </div>
+        <div class="badge-row" aria-label="Ventajas principales">
+          <span class="badge">{t('home.privacyBadge')}</span>
+          <span class="badge">{t('home.formatsBadge')}</span>
+        </div>
+      </div>
+      <div class="hero-card" aria-hidden="true">
+        <div class="mock-toolbar"><span></span><span></span><span></span></div>
+        <div class="mock-image">
+          <span class="mock-sun"></span>
+          <span class="mock-mountain one"></span>
+          <span class="mock-mountain two"></span>
+        </div>
+        <div class="mock-controls">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    </section>
+
+    <ImageStudio locale={locale} />
+
+    <section id="tools" class="content-section" aria-labelledby="tools-title">
+      <div class="section-heading">
+        <p class="section-kicker">FácilIMG</p>
+        <h2 id="tools-title">{t('tools.title')}</h2>
+        <p>{t('tools.description')}</p>
+      </div>
+      <div class="tool-grid">
+        {tools.map(([key, icon]) => (
+          <article class="tool-card">
+            <span class="tool-icon" aria-hidden="true">{icon}</span>
+            <h3>{t(`tools.${key}.title`)}</h3>
+            <p>{t(`tools.${key}.description`)}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+
+    <section class="split-section" aria-labelledby="how-title">
+      <div>
+        <p class="section-kicker">Workflow</p>
+        <h2 id="how-title">{t('how.title')}</h2>
+      </div>
+      <ol class="steps-list">
+        <li>{t('how.one')}</li>
+        <li>{t('how.two')}</li>
+        <li>{t('how.three')}</li>
+      </ol>
+    </section>
+
+    <section id="faq" class="content-section faq-section" aria-labelledby="faq-title">
+      <div class="section-heading">
+        <p class="section-kicker">FAQ</p>
+        <h2 id="faq-title">{t('faq.title')}</h2>
+      </div>
+      <div class="faq-list">
+        <details open>
+          <summary>{t('faq.private.q')}</summary>
+          <p>{t('faq.private.a')}</p>
+        </details>
+        <details>
+          <summary>{t('faq.mobile.q')}</summary>
+          <p>{t('faq.mobile.a')}</p>
+        </details>
+        <details>
+          <summary>{t('faq.batch.q')}</summary>
+          <p>{t('faq.batch.a')}</p>
+        </details>
       </div>
     </section>
   </Container>
