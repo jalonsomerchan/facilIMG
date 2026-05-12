@@ -29,8 +29,26 @@ const t = useTranslations(locale);
 
     <div class="workspace" hidden data-workspace>
       <div class="preview-card">
-        <canvas data-canvas aria-label={t('editor.previewLabel')}></canvas>
+        <div class="visual-editor" data-editor-stage>
+          <div class="canvas-frame" data-canvas-frame>
+            <canvas data-canvas aria-label={t('editor.previewLabel')}></canvas>
+            <div class="resize-shell" data-resize-shell aria-hidden="true">
+              <button type="button" class="resize-handle nw" data-resize-handle="nw" aria-label={t('editor.resizeHandle')}></button>
+              <button type="button" class="resize-handle ne" data-resize-handle="ne" aria-label={t('editor.resizeHandle')}></button>
+              <button type="button" class="resize-handle sw" data-resize-handle="sw" aria-label={t('editor.resizeHandle')}></button>
+              <button type="button" class="resize-handle se" data-resize-handle="se" aria-label={t('editor.resizeHandle')}></button>
+            </div>
+            <div class="crop-box" hidden data-crop-box>
+              <span class="crop-grid" aria-hidden="true"></span>
+              <button type="button" class="crop-handle nw" data-crop-handle="nw" aria-label={t('editor.cropHandle')}></button>
+              <button type="button" class="crop-handle ne" data-crop-handle="ne" aria-label={t('editor.cropHandle')}></button>
+              <button type="button" class="crop-handle sw" data-crop-handle="sw" aria-label={t('editor.cropHandle')}></button>
+              <button type="button" class="crop-handle se" data-crop-handle="se" aria-label={t('editor.cropHandle')}></button>
+            </div>
+          </div>
+        </div>
         <p class="file-meta" data-file-meta>{t('editor.emptyMeta')}</p>
+        <p class="visual-hint" data-visual-hint>{t('editor.visualHint')}</p>
       </div>
 
       <form class="controls" data-controls>
@@ -51,12 +69,12 @@ const t = useTranslations(locale);
         </fieldset>
 
         <fieldset>
-          <legend>{t('editor.size')}</legend>
-          <div class="control-grid">
-            <label><span>{t('editor.width')}</span><input type="number" min="1" data-width /></label>
-            <label><span>{t('editor.height')}</span><input type="number" min="1" data-height /></label>
+          <legend>{t('editor.visualTools')}</legend>
+          <div class="button-row">
+            <button type="button" class="btn btn-secondary" data-crop-toggle>{t('editor.crop')}</button>
+            <button type="button" class="btn btn-secondary" data-apply-crop disabled>{t('editor.applyCrop')}</button>
           </div>
-          <label class="checkbox"><input type="checkbox" checked data-lock-ratio /> {t('editor.lockRatio')}</label>
+          <p class="help-text">{t('editor.visualToolsHelp')}</p>
         </fieldset>
 
         <fieldset>
@@ -103,12 +121,18 @@ const t = useTranslations(locale);
     const input = root.querySelector('[data-file-input]');
     const dropzone = root.querySelector('[data-dropzone]');
     const workspace = root.querySelector('[data-workspace]');
+    const frame = root.querySelector('[data-canvas-frame]');
     const canvas = root.querySelector('[data-canvas]');
+    const cropBox = root.querySelector('[data-crop-box]');
     const meta = root.querySelector('[data-file-meta]');
+    const visualHint = root.querySelector('[data-visual-hint]');
+    const applyCropButton = root.querySelector('[data-apply-crop]');
+    const cropToggleButton = root.querySelector('[data-crop-toggle]');
     const ctx = canvas.getContext('2d');
 
     const state = {
       image: null,
+      sourceCanvas: null,
       name: 'facilimg',
       originalWidth: 0,
       originalHeight: 0,
@@ -119,16 +143,24 @@ const t = useTranslations(locale);
       flipY: 1,
       grayscale: false,
       sepia: false,
+      cropActive: false,
+      crop: { x: 10, y: 10, width: 80, height: 80 },
     };
 
     const $ = (selector) => root.querySelector(selector);
-    const widthInput = $('[data-width]');
-    const heightInput = $('[data-height]');
-    const ratioInput = $('[data-lock-ratio]');
     const controls = root.querySelectorAll('input, select');
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
     function fileBaseName(name) {
       return name.replace(/\.[^.]+$/, '').replace(/[^a-z0-9-_]+/gi, '-').replace(/^-|-$/g, '') || 'facilimg';
+    }
+
+    function createSourceCanvas(image, width = image.naturalWidth, height = image.naturalHeight) {
+      const source = document.createElement('canvas');
+      source.width = width;
+      source.height = height;
+      source.getContext('2d').drawImage(image, 0, 0, width, height);
+      return source;
     }
 
     function readImage(file) {
@@ -138,6 +170,7 @@ const t = useTranslations(locale);
       image.onload = () => {
         URL.revokeObjectURL(url);
         state.image = image;
+        state.sourceCanvas = createSourceCanvas(image);
         state.name = fileBaseName(file.name);
         state.originalWidth = image.naturalWidth;
         state.originalHeight = image.naturalHeight;
@@ -148,9 +181,10 @@ const t = useTranslations(locale);
         state.flipY = 1;
         state.grayscale = false;
         state.sepia = false;
-        widthInput.value = state.width;
-        heightInput.value = state.height;
+        state.cropActive = false;
         workspace.hidden = false;
+        resetCropBox();
+        syncCropUi();
         render();
       };
       image.src = url;
@@ -168,53 +202,186 @@ const t = useTranslations(locale);
       return parts.join(' ');
     }
 
-    function render() {
-      if (!state.image) return;
+    function drawToCanvas(targetCanvas, includeWatermark = true) {
+      if (!state.sourceCanvas) return;
+      const targetCtx = targetCanvas.getContext('2d');
       const rotated = state.rotate % 180 !== 0;
-      canvas.width = rotated ? state.height : state.width;
-      canvas.height = rotated ? state.width : state.height;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.save();
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate((state.rotate * Math.PI) / 180);
-      ctx.scale(state.flipX, state.flipY);
-      ctx.filter = filterValue();
-      ctx.drawImage(state.image, -state.width / 2, -state.height / 2, state.width, state.height);
-      ctx.restore();
+      targetCanvas.width = rotated ? state.height : state.width;
+      targetCanvas.height = rotated ? state.width : state.height;
+      targetCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+      targetCtx.save();
+      targetCtx.translate(targetCanvas.width / 2, targetCanvas.height / 2);
+      targetCtx.rotate((state.rotate * Math.PI) / 180);
+      targetCtx.scale(state.flipX, state.flipY);
+      targetCtx.filter = filterValue();
+      targetCtx.drawImage(state.sourceCanvas, -state.width / 2, -state.height / 2, state.width, state.height);
+      targetCtx.restore();
 
       const watermark = $('[data-watermark]').value.trim();
-      if (watermark) {
-        const fontSize = Math.max(18, Math.round(canvas.width / 28));
-        ctx.save();
-        ctx.font = `700 ${fontSize}px system-ui, sans-serif`;
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'bottom';
-        ctx.fillStyle = 'rgba(0,0,0,.55)';
-        ctx.fillText(watermark, canvas.width - 24, canvas.height - 22);
-        ctx.fillStyle = 'rgba(255,255,255,.86)';
-        ctx.fillText(watermark, canvas.width - 26, canvas.height - 24);
-        ctx.restore();
+      if (includeWatermark && watermark) {
+        const fontSize = Math.max(18, Math.round(targetCanvas.width / 28));
+        targetCtx.save();
+        targetCtx.font = `700 ${fontSize}px system-ui, sans-serif`;
+        targetCtx.textAlign = 'right';
+        targetCtx.textBaseline = 'bottom';
+        targetCtx.fillStyle = 'rgba(0,0,0,.55)';
+        targetCtx.fillText(watermark, targetCanvas.width - 24, targetCanvas.height - 22);
+        targetCtx.fillStyle = 'rgba(255,255,255,.86)';
+        targetCtx.fillText(watermark, targetCanvas.width - 26, targetCanvas.height - 24);
+        targetCtx.restore();
       }
+    }
 
+    function render() {
+      if (!state.sourceCanvas) return;
+      drawToCanvas(canvas, true);
+      syncFrameSize();
+      syncCropUi();
       meta.textContent = `${state.originalWidth}×${state.originalHeight}px → ${canvas.width}×${canvas.height}px`;
     }
 
-    function setWidth(value) {
-      state.width = Math.max(1, Number(value) || state.originalWidth);
-      if (ratioInput.checked) {
-        state.height = Math.max(1, Math.round((state.width * state.originalHeight) / state.originalWidth));
-        heightInput.value = state.height;
-      }
+    function syncFrameSize() {
+      requestAnimationFrame(() => {
+        const rect = canvas.getBoundingClientRect();
+        frame.style.width = `${rect.width}px`;
+        frame.style.height = `${rect.height}px`;
+      });
+    }
+
+    function resetCropBox() {
+      state.crop = { x: 12, y: 12, width: 76, height: 76 };
+    }
+
+    function syncCropUi() {
+      cropBox.hidden = !state.cropActive;
+      applyCropButton.disabled = !state.cropActive;
+      cropToggleButton.classList.toggle('is-active', state.cropActive);
+      visualHint.textContent = state.cropActive
+        ? cropToggleButton.dataset.cropHint || visualHint.textContent
+        : visualHint.dataset.defaultHint || visualHint.textContent;
+      cropBox.style.left = `${state.crop.x}%`;
+      cropBox.style.top = `${state.crop.y}%`;
+      cropBox.style.width = `${state.crop.width}%`;
+      cropBox.style.height = `${state.crop.height}%`;
+    }
+
+    function canvasScale() {
+      const rect = canvas.getBoundingClientRect();
+      return { x: canvas.width / rect.width, y: canvas.height / rect.height, rect };
+    }
+
+    function setVisualSize(nextWidth, nextHeight) {
+      const max = 8000;
+      state.width = Math.round(clamp(nextWidth, 32, max));
+      state.height = Math.round(clamp(nextHeight, 32, max));
       render();
     }
 
-    function setHeight(value) {
-      state.height = Math.max(1, Number(value) || state.originalHeight);
-      if (ratioInput.checked) {
-        state.width = Math.max(1, Math.round((state.height * state.originalWidth) / state.originalHeight));
-        widthInput.value = state.width;
-      }
+    function cropToImage() {
+      if (!state.cropActive || !state.sourceCanvas) return;
+      const rendered = document.createElement('canvas');
+      drawToCanvas(rendered, false);
+      const sx = Math.round((state.crop.x / 100) * rendered.width);
+      const sy = Math.round((state.crop.y / 100) * rendered.height);
+      const sw = Math.round((state.crop.width / 100) * rendered.width);
+      const sh = Math.round((state.crop.height / 100) * rendered.height);
+      if (sw < 2 || sh < 2) return;
+      const cropped = document.createElement('canvas');
+      cropped.width = sw;
+      cropped.height = sh;
+      cropped.getContext('2d').drawImage(rendered, sx, sy, sw, sh, 0, 0, sw, sh);
+      state.sourceCanvas = cropped;
+      state.width = sw;
+      state.height = sh;
+      state.originalWidth = sw;
+      state.originalHeight = sh;
+      state.rotate = 0;
+      state.flipX = 1;
+      state.flipY = 1;
+      state.cropActive = false;
+      resetCropBox();
       render();
+    }
+
+    function startResize(event, handle) {
+      if (!state.sourceCanvas) return;
+      event.preventDefault();
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const startWidth = state.width;
+      const startHeight = state.height;
+      const ratio = startWidth / startHeight;
+      const { rect } = canvasScale();
+      const scaleX = state.width / rect.width;
+      const scaleY = state.height / rect.height;
+
+      const move = (moveEvent) => {
+        const dx = (moveEvent.clientX - startX) * scaleX;
+        const dy = (moveEvent.clientY - startY) * scaleY;
+        const signX = handle.includes('w') ? -1 : 1;
+        const signY = handle.includes('n') ? -1 : 1;
+        let nextWidth = startWidth + dx * signX;
+        let nextHeight = startHeight + dy * signY;
+        const dominant = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+        if (dominant === 'x') nextHeight = nextWidth / ratio;
+        else nextWidth = nextHeight * ratio;
+        setVisualSize(nextWidth, nextHeight);
+      };
+
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    }
+
+    function startCropMove(event, mode) {
+      if (!state.cropActive) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const startCrop = { ...state.crop };
+      const { rect } = canvasScale();
+
+      const move = (moveEvent) => {
+        const dx = ((moveEvent.clientX - startX) / rect.width) * 100;
+        const dy = ((moveEvent.clientY - startY) / rect.height) * 100;
+        const next = { ...startCrop };
+
+        if (mode === 'move') {
+          next.x = clamp(startCrop.x + dx, 0, 100 - startCrop.width);
+          next.y = clamp(startCrop.y + dy, 0, 100 - startCrop.height);
+        } else {
+          if (mode.includes('w')) {
+            const right = startCrop.x + startCrop.width;
+            next.x = clamp(startCrop.x + dx, 0, right - 8);
+            next.width = right - next.x;
+          }
+          if (mode.includes('e')) {
+            next.width = clamp(startCrop.width + dx, 8, 100 - startCrop.x);
+          }
+          if (mode.includes('n')) {
+            const bottom = startCrop.y + startCrop.height;
+            next.y = clamp(startCrop.y + dy, 0, bottom - 8);
+            next.height = bottom - next.y;
+          }
+          if (mode.includes('s')) {
+            next.height = clamp(startCrop.height + dy, 8, 100 - startCrop.y);
+          }
+        }
+
+        state.crop = next;
+        syncCropUi();
+      };
+
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
     }
 
     input.addEventListener('change', () => readImage(input.files?.[0]));
@@ -229,9 +396,17 @@ const t = useTranslations(locale);
       readImage(event.dataTransfer?.files?.[0]);
     });
 
-    widthInput.addEventListener('input', () => setWidth(widthInput.value));
-    heightInput.addEventListener('input', () => setHeight(heightInput.value));
     root.querySelectorAll('[data-quality], [data-format], [data-brightness], [data-contrast], [data-saturation], [data-blur], [data-watermark]').forEach((el) => el.addEventListener('input', render));
+    root.querySelectorAll('[data-resize-handle]').forEach((handle) => handle.addEventListener('pointerdown', (event) => startResize(event, handle.dataset.resizeHandle)));
+    cropBox.addEventListener('pointerdown', (event) => startCropMove(event, 'move'));
+    root.querySelectorAll('[data-crop-handle]').forEach((handle) => handle.addEventListener('pointerdown', (event) => startCropMove(event, handle.dataset.cropHandle)));
+    cropToggleButton.dataset.cropHint = visualHint.dataset.cropHint = visualHint.textContent;
+    visualHint.dataset.defaultHint = visualHint.textContent;
+    cropToggleButton.addEventListener('click', () => {
+      state.cropActive = !state.cropActive;
+      syncCropUi();
+    });
+    applyCropButton.addEventListener('click', cropToImage);
     $('[data-rotate]').addEventListener('click', () => { state.rotate = (state.rotate + 90) % 360; render(); });
     $('[data-flip-x]').addEventListener('click', () => { state.flipX *= -1; render(); });
     $('[data-flip-y]').addEventListener('click', () => { state.flipY *= -1; render(); });
@@ -242,19 +417,24 @@ const t = useTranslations(locale);
         if (control.type === 'range') control.value = control.defaultValue;
         if (control.type === 'text') control.value = '';
       });
-      state.width = state.originalWidth;
-      state.height = state.originalHeight;
+      if (state.image) {
+        state.sourceCanvas = createSourceCanvas(state.image);
+        state.originalWidth = state.image.naturalWidth;
+        state.originalHeight = state.image.naturalHeight;
+        state.width = state.image.naturalWidth;
+        state.height = state.image.naturalHeight;
+      }
       state.rotate = 0;
       state.flipX = 1;
       state.flipY = 1;
       state.grayscale = false;
       state.sepia = false;
-      widthInput.value = state.width;
-      heightInput.value = state.height;
+      state.cropActive = false;
+      resetCropBox();
       render();
     });
     $('[data-download]').addEventListener('click', () => {
-      if (!state.image) return;
+      if (!state.sourceCanvas) return;
       const format = $('[data-format]').value;
       const quality = Number($('[data-quality]').value);
       const extension = format.split('/')[1].replace('jpeg', 'jpg');
@@ -268,6 +448,7 @@ const t = useTranslations(locale);
         URL.revokeObjectURL(url);
       }, format, quality);
     });
+    window.addEventListener('resize', syncFrameSize);
   })();
 </script>
 
@@ -282,24 +463,35 @@ const t = useTranslations(locale);
   .dropzone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
   .dropzone label { min-height: 13rem; display: grid; place-items: center; gap: .35rem; text-align: center; padding: var(--space-8); cursor: pointer; }
   .dropzone-icon { display: grid; place-items: center; width: 3.5rem; height: 3.5rem; border-radius: var(--radius-xl); background: var(--color-primary); color: white; font-size: 1.6rem; box-shadow: var(--shadow-sm); }
-  .dropzone span:last-child, .privacy-note, .file-meta { color: var(--color-text-soft); }
+  .dropzone span:last-child, .privacy-note, .file-meta, .visual-hint, .help-text { color: var(--color-text-soft); }
   .workspace { display: grid; gap: var(--space-5); margin-top: var(--space-5); }
   .preview-card { display: grid; gap: var(--space-3); align-content: start; border: 1px solid var(--color-border); border-radius: var(--radius-xl); padding: var(--space-4); background: var(--color-surface-soft); }
-  canvas { width: 100%; max-height: 64vh; object-fit: contain; border-radius: var(--radius-lg); background: repeating-conic-gradient(var(--color-border) 0 25%, transparent 0 50%) 50% / 1.2rem 1.2rem; }
+  .visual-editor { display: grid; place-items: center; min-height: 18rem; overflow: auto; border-radius: var(--radius-xl); padding: var(--space-4); background: repeating-conic-gradient(color-mix(in srgb, var(--color-border), transparent 20%) 0 25%, transparent 0 50%) 50% / 1.2rem 1.2rem; }
+  .canvas-frame { position: relative; display: inline-block; max-width: 100%; touch-action: none; }
+  canvas { width: 100%; max-width: min(100%, 68rem); max-height: 64vh; object-fit: contain; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); background: var(--color-surface); }
+  .resize-shell { position: absolute; inset: 0; border: 2px solid var(--color-primary); border-radius: var(--radius-lg); pointer-events: none; }
+  .resize-handle, .crop-handle { position: absolute; width: 1.15rem; height: 1.15rem; border: 2px solid #fff; border-radius: var(--radius-full); background: var(--color-primary); box-shadow: var(--shadow-sm); pointer-events: auto; }
+  .resize-handle.nw, .crop-handle.nw { left: -.6rem; top: -.6rem; cursor: nwse-resize; }
+  .resize-handle.ne, .crop-handle.ne { right: -.6rem; top: -.6rem; cursor: nesw-resize; }
+  .resize-handle.sw, .crop-handle.sw { left: -.6rem; bottom: -.6rem; cursor: nesw-resize; }
+  .resize-handle.se, .crop-handle.se { right: -.6rem; bottom: -.6rem; cursor: nwse-resize; }
+  .crop-box { position: absolute; border: 2px solid #fff; background: rgb(14 165 233 / .16); box-shadow: 0 0 0 9999px rgb(2 6 23 / .48), 0 0 0 1px var(--color-primary); cursor: move; touch-action: none; }
+  .crop-grid { position: absolute; inset: 0; background: linear-gradient(90deg, transparent 33%, rgb(255 255 255 / .7) 33% 34%, transparent 34% 66%, rgb(255 255 255 / .7) 66% 67%, transparent 67%), linear-gradient(0deg, transparent 33%, rgb(255 255 255 / .7) 33% 34%, transparent 34% 66%, rgb(255 255 255 / .7) 66% 67%, transparent 67%); pointer-events: none; }
+  .visual-hint, .help-text, .file-meta { margin: 0; font-size: .92rem; }
   .controls { display: grid; gap: var(--space-4); }
   fieldset { border: 1px solid var(--color-border); border-radius: var(--radius-xl); padding: var(--space-4); background: var(--color-surface); }
   legend { padding-inline: .35rem; font-weight: 800; }
   label { display: grid; gap: .45rem; margin-top: .8rem; font-weight: 700; }
   input, select { min-height: 2.75rem; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); color: var(--color-text); padding: .7rem .85rem; font: inherit; }
   input[type='range'] { padding-inline: 0; }
-  .checkbox { display: flex; align-items: center; gap: .55rem; color: var(--color-text-muted); }
-  .checkbox input { min-height: auto; }
-  .control-grid, .button-row, .action-row { display: grid; gap: .75rem; }
+  .button-row, .action-row { display: grid; gap: .75rem; }
   .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; border-radius: var(--radius-lg); border: 1px solid transparent; padding: .75rem 1rem; font-weight: 800; cursor: pointer; transition: transform var(--transition-fast), background var(--transition-base), border-color var(--transition-base); }
   .btn:hover { transform: translateY(-1px); }
+  .btn:disabled { cursor: not-allowed; opacity: .48; transform: none; }
   .btn-primary { background: var(--color-primary); color: white; }
   .btn-secondary { background: var(--color-surface-soft); color: var(--color-text); border-color: var(--color-border); }
+  .btn-secondary.is-active { border-color: var(--color-primary); background: var(--color-primary-soft); }
   .btn-ghost { background: transparent; color: var(--color-text-muted); }
   .privacy-note { margin: 0; font-size: .92rem; }
-  @media (min-width: 760px) { .workspace { grid-template-columns: minmax(0, 1.15fr) minmax(20rem, .85fr); align-items: start; } .control-grid, .button-row, .action-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 760px) { .workspace { grid-template-columns: minmax(0, 1.15fr) minmax(20rem, .85fr); align-items: start; } .button-row, .action-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 </style>
