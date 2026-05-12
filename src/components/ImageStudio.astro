@@ -49,34 +49,51 @@ const t = useTranslations(locale);
         <p class="visual-hint" data-visual-hint>{t('editor.visualHint')}</p>
       </div>
 
-      <form class="controls" data-controls>
-        <fieldset>
-          <legend>{t('editor.output')}</legend>
-          <label><span>{t('editor.format')}</span><select data-format><option value="image/png">PNG</option><option value="image/jpeg">JPG</option><option value="image/webp">WebP</option></select></label>
-          <label><span>{t('editor.quality')}</span><input type="range" min="0.4" max="1" step="0.05" value="0.85" data-quality /></label>
-        </fieldset>
-        <fieldset>
-          <legend>{t('editor.visualTools')}</legend>
-          <div class="button-row"><button type="button" class="btn btn-secondary" data-crop-toggle>{t('editor.crop')}</button><button type="button" class="btn btn-secondary" data-apply-crop disabled>{t('editor.applyCrop')}</button></div>
-          <p class="help-text">{t('editor.visualToolsHelp')}</p>
-        </fieldset>
-        <fieldset>
-          <legend>{t('editor.transforms')}</legend>
-          <div class="button-row"><button type="button" class="btn btn-secondary" data-rotate>{t('editor.rotate')}</button><button type="button" class="btn btn-secondary" data-flip-x>{t('editor.flipX')}</button><button type="button" class="btn btn-secondary" data-flip-y>{t('editor.flipY')}</button></div>
-        </fieldset>
-        <fieldset>
-          <legend>{t('editor.filters')}</legend>
-          <label><span>{t('editor.brightness')}</span><input type="range" min="50" max="150" value="100" data-brightness /></label>
-          <label><span>{t('editor.contrast')}</span><input type="range" min="50" max="150" value="100" data-contrast /></label>
-          <label><span>{t('editor.saturation')}</span><input type="range" min="0" max="200" value="100" data-saturation /></label>
-          <label><span>{t('editor.blur')}</span><input type="range" min="0" max="8" step="0.5" value="0" data-blur /></label>
-          <div class="button-row"><button type="button" class="btn btn-secondary" data-grayscale>{t('editor.grayscale')}</button><button type="button" class="btn btn-secondary" data-sepia>{t('editor.sepia')}</button></div>
-        </fieldset>
-        <fieldset>
-          <legend>{t('editor.watermark')}</legend>
-          <label><span>{t('editor.watermarkText')}</span><input type="text" maxlength="48" data-watermark placeholder={t('editor.watermarkPlaceholder')} /></label>
-        </fieldset>
-        <div class="action-row"><button type="button" class="btn btn-primary" data-download>{t('editor.download')}</button><button type="button" class="btn btn-ghost" data-reset>{t('editor.reset')}</button></div>
+      <form class="controls toolbar" data-controls>
+        <div class="toolbar-head">
+          <span class="toolbar-icon" aria-hidden="true">🧰</span>
+          <div>
+            <strong>{t('editor.visualTools')}</strong>
+            <small>{t('editor.visualToolsHelp')}</small>
+          </div>
+        </div>
+
+        <div class="tool-grid-actions" aria-label={t('editor.visualTools')}>
+          <button type="button" class="tool-btn" data-crop-toggle><span aria-hidden="true">✂️</span><b>{t('editor.crop')}</b></button>
+          <button type="button" class="tool-btn" data-apply-crop disabled><span aria-hidden="true">✅</span><b>{t('editor.applyCrop')}</b></button>
+          <button type="button" class="tool-btn" data-rotate><span aria-hidden="true">↻</span><b>{t('editor.rotate')}</b></button>
+          <button type="button" class="tool-btn" data-flip-x><span aria-hidden="true">↔️</span><b>{t('editor.flipX')}</b></button>
+          <button type="button" class="tool-btn" data-flip-y><span aria-hidden="true">↕️</span><b>{t('editor.flipY')}</b></button>
+          <button type="button" class="tool-btn" data-grayscale><span aria-hidden="true">◐</span><b>{t('editor.grayscale')}</b></button>
+          <button type="button" class="tool-btn" data-sepia><span aria-hidden="true">🟤</span><b>{t('editor.sepia')}</b></button>
+        </div>
+
+        <details class="tool-section" open>
+          <summary><span aria-hidden="true">💾</span>{t('editor.output')}</summary>
+          <div class="compact-controls">
+            <label><span>{t('editor.format')}</span><select data-format><option value="image/png">PNG</option><option value="image/jpeg">JPG</option><option value="image/webp">WebP</option></select></label>
+            <label><span>{t('editor.quality')}</span><input type="range" min="0.4" max="1" step="0.05" value="0.85" data-quality /></label>
+          </div>
+        </details>
+
+        <details class="tool-section" open>
+          <summary><span aria-hidden="true">✨</span>{t('editor.filters')}</summary>
+          <div class="compact-controls">
+            <label><span>{t('editor.brightness')}</span><input type="range" min="50" max="150" value="100" data-brightness /></label>
+            <label><span>{t('editor.contrast')}</span><input type="range" min="50" max="150" value="100" data-contrast /></label>
+            <label><span>{t('editor.saturation')}</span><input type="range" min="0" max="200" value="100" data-saturation /></label>
+            <label><span>{t('editor.blur')}</span><input type="range" min="0" max="8" step="0.5" value="0" data-blur /></label>
+          </div>
+        </details>
+
+        <details class="tool-section">
+          <summary><span aria-hidden="true">©️</span>{t('editor.watermark')}</summary>
+          <div class="compact-controls">
+            <label><span>{t('editor.watermarkText')}</span><input type="text" maxlength="48" data-watermark placeholder={t('editor.watermarkPlaceholder')} /></label>
+          </div>
+        </details>
+
+        <div class="action-row"><button type="button" class="btn btn-primary" data-download><span aria-hidden="true">⬇️</span>{t('editor.download')}</button><button type="button" class="btn btn-ghost" data-reset><span aria-hidden="true">↺</span>{t('editor.reset')}</button></div>
         <p class="privacy-note">{t('editor.privacy')}</p>
       </form>
     </div>
@@ -211,5 +228,5 @@ const t = useTranslations(locale);
 </script>
 
 <style>
-  .image-studio,.workspace,.controls{display:grid;gap:var(--space-5)}.image-studio{margin-block:var(--space-16)}.studio-copy{max-width:48rem}.studio-copy h2{margin:0;font-size:clamp(2rem,5vw,3rem);line-height:1.05;letter-spacing:-.04em}.studio-copy p:last-child{color:var(--color-text-muted);font-size:1.08rem}.studio-panel,.preview-card,fieldset{border:1px solid var(--color-border);background:var(--color-surface)}.studio-panel{border-radius:var(--radius-2xl);box-shadow:var(--shadow-md);padding:var(--space-4)}.dropzone{position:relative;border:2px dashed var(--color-border-strong);border-radius:var(--radius-xl);background:linear-gradient(135deg,var(--color-primary-soft),transparent 55%),var(--color-surface-soft)}.dropzone.is-dragging{border-color:var(--color-primary);transform:scale(1.01)}.dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer}.dropzone label{min-height:13rem;display:grid;place-items:center;gap:.35rem;text-align:center;padding:var(--space-8);cursor:pointer}.dropzone-icon{display:grid;place-items:center;width:3.5rem;height:3.5rem;border-radius:var(--radius-xl);background:var(--color-primary);color:white;font-size:1.6rem}.preview-card{border-radius:var(--radius-xl);padding:var(--space-4);background:var(--color-surface-soft)}.visual-editor{display:grid;place-items:center;min-height:18rem;overflow:auto;border-radius:var(--radius-xl);padding:var(--space-4);background:repeating-conic-gradient(color-mix(in srgb,var(--color-border),transparent 20%) 0 25%,transparent 0 50%) 50%/1.2rem 1.2rem}.image-frame{position:relative;display:inline-block;overflow:hidden;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);background:var(--color-surface);touch-action:none}.preview-img{position:absolute;left:50%;top:50%;width:100%;height:100%;object-fit:fill;display:block;transform-origin:center}.resize-box{position:absolute;inset:0;border:2px solid var(--color-primary);border-radius:var(--radius-lg);pointer-events:none}.handle{position:absolute;width:1.15rem;height:1.15rem;border:2px solid white;border-radius:999px;background:var(--color-primary);box-shadow:var(--shadow-sm);pointer-events:auto}.nw{left:-.6rem;top:-.6rem;cursor:nwse-resize}.ne{right:-.6rem;top:-.6rem;cursor:nesw-resize}.sw{left:-.6rem;bottom:-.6rem;cursor:nesw-resize}.se{right:-.6rem;bottom:-.6rem;cursor:nwse-resize}.crop-box{position:absolute;border:2px solid white;background:rgb(14 165 233/.16);box-shadow:0 0 0 9999px rgb(2 6 23/.48),0 0 0 1px var(--color-primary);cursor:move;touch-action:none}.crop-grid{position:absolute;inset:0;background:linear-gradient(90deg,transparent 33%,rgb(255 255 255/.7) 33% 34%,transparent 34% 66%,rgb(255 255 255/.7) 66% 67%,transparent 67%),linear-gradient(0deg,transparent 33%,rgb(255 255 255/.7) 33% 34%,transparent 34% 66%,rgb(255 255 255/.7) 66% 67%,transparent 67%);pointer-events:none}.file-meta,.visual-hint,.help-text,.privacy-note{margin:0;color:var(--color-text-soft);font-size:.92rem}fieldset{border-radius:var(--radius-xl);padding:var(--space-4)}legend{font-weight:800;padding-inline:.35rem}label{display:grid;gap:.45rem;margin-top:.8rem;font-weight:700}input,select{min-height:2.75rem;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);color:var(--color-text);padding:.7rem .85rem;font:inherit}input[type=range]{padding-inline:0}.button-row,.action-row{display:grid;gap:.75rem}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:2.75rem;border-radius:var(--radius-lg);border:1px solid transparent;padding:.75rem 1rem;font-weight:800;cursor:pointer}.btn:disabled{cursor:not-allowed;opacity:.48}.btn-primary{background:var(--color-primary);color:white}.btn-secondary{background:var(--color-surface-soft);color:var(--color-text);border-color:var(--color-border)}.btn-secondary.is-active{border-color:var(--color-primary);background:var(--color-primary-soft)}.btn-ghost{background:transparent;color:var(--color-text-muted)}@media (min-width:760px){.workspace{grid-template-columns:minmax(0,1.15fr) minmax(20rem,.85fr);align-items:start}.button-row,.action-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .image-studio,.workspace,.controls{display:grid;gap:var(--space-5)}.image-studio{margin-block:var(--space-16)}.studio-copy{max-width:48rem}.studio-copy h2{margin:0;font-size:clamp(2rem,5vw,3rem);line-height:1.05;letter-spacing:-.04em}.studio-copy p:last-child{color:var(--color-text-muted);font-size:1.08rem}.studio-panel,.preview-card,.toolbar{border:1px solid var(--color-border);background:var(--color-surface)}.studio-panel{border-radius:var(--radius-2xl);box-shadow:var(--shadow-md);padding:var(--space-4)}.dropzone{position:relative;border:2px dashed var(--color-border-strong);border-radius:var(--radius-xl);background:linear-gradient(135deg,var(--color-primary-soft),transparent 55%),var(--color-surface-soft)}.dropzone.is-dragging{border-color:var(--color-primary);transform:scale(1.01)}.dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer}.dropzone label{min-height:13rem;display:grid;place-items:center;gap:.35rem;text-align:center;padding:var(--space-8);cursor:pointer}.dropzone-icon{display:grid;place-items:center;width:3.5rem;height:3.5rem;border-radius:var(--radius-xl);background:var(--color-primary);color:white;font-size:1.6rem}.preview-card{border-radius:var(--radius-xl);padding:var(--space-4);background:var(--color-surface-soft)}.visual-editor{display:grid;place-items:center;min-height:18rem;overflow:auto;border-radius:var(--radius-xl);padding:var(--space-4);background:repeating-conic-gradient(color-mix(in srgb,var(--color-border),transparent 20%) 0 25%,transparent 0 50%) 50%/1.2rem 1.2rem}.image-frame{position:relative;display:inline-block;overflow:hidden;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);background:var(--color-surface);touch-action:none}.preview-img{position:absolute;left:50%;top:50%;width:100%;height:100%;object-fit:fill;display:block;transform-origin:center}.resize-box{position:absolute;inset:0;border:2px solid var(--color-primary);border-radius:var(--radius-lg);pointer-events:none}.handle{position:absolute;width:1.15rem;height:1.15rem;border:2px solid white;border-radius:999px;background:var(--color-primary);box-shadow:var(--shadow-sm);pointer-events:auto}.nw{left:-.6rem;top:-.6rem;cursor:nwse-resize}.ne{right:-.6rem;top:-.6rem;cursor:nesw-resize}.sw{left:-.6rem;bottom:-.6rem;cursor:nesw-resize}.se{right:-.6rem;bottom:-.6rem;cursor:nwse-resize}.crop-box{position:absolute;border:2px solid white;background:rgb(14 165 233/.16);box-shadow:0 0 0 9999px rgb(2 6 23/.48),0 0 0 1px var(--color-primary);cursor:move;touch-action:none}.crop-grid{position:absolute;inset:0;background:linear-gradient(90deg,transparent 33%,rgb(255 255 255/.7) 33% 34%,transparent 34% 66%,rgb(255 255 255/.7) 66% 67%,transparent 67%),linear-gradient(0deg,transparent 33%,rgb(255 255 255/.7) 33% 34%,transparent 34% 66%,rgb(255 255 255/.7) 66% 67%,transparent 67%);pointer-events:none}.file-meta,.visual-hint,.help-text,.privacy-note{margin:0;color:var(--color-text-soft);font-size:.92rem}.toolbar{position:relative;align-self:start;border-radius:var(--radius-xl);padding:var(--space-4);box-shadow:var(--shadow-xs)}.toolbar-head{display:flex;gap:.8rem;align-items:flex-start;padding:.2rem .1rem .75rem;border-bottom:1px solid var(--color-border)}.toolbar-icon{display:grid;place-items:center;flex:0 0 2.35rem;height:2.35rem;border-radius:.85rem;background:var(--color-primary-soft);font-size:1.25rem}.toolbar-head strong{display:block;font-size:1rem}.toolbar-head small{display:block;color:var(--color-text-soft);font-size:.8rem;line-height:1.35;margin-top:.15rem}.tool-grid-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem;margin-top:var(--space-4)}.tool-btn{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:.5rem;min-height:2.75rem;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface-soft);color:var(--color-text);padding:.55rem .7rem;text-align:left;font:inherit;font-weight:800;cursor:pointer}.tool-btn span{font-size:1.05rem}.tool-btn b{font-size:.82rem;line-height:1.1}.tool-btn:hover,.tool-btn.is-active{border-color:var(--color-primary);background:var(--color-primary-soft)}.tool-btn:disabled{cursor:not-allowed;opacity:.45}.tool-section{border:1px solid var(--color-border);border-radius:var(--radius-lg);margin-top:.75rem;background:var(--color-surface-soft);overflow:hidden}.tool-section summary{display:flex;align-items:center;gap:.55rem;padding:.75rem .85rem;font-weight:900;cursor:pointer;list-style:none}.tool-section summary::-webkit-details-marker{display:none}.tool-section summary::after{content:'⌄';margin-left:auto;color:var(--color-text-soft)}.tool-section[open] summary::after{transform:rotate(180deg)}.compact-controls{display:grid;gap:.85rem;padding:0 .85rem .9rem}.compact-controls label{display:grid;gap:.38rem;font-weight:800}.compact-controls label span{font-size:.82rem;color:var(--color-text-muted)}input,select{min-height:2.65rem;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);color:var(--color-text);padding:.65rem .8rem;font:inherit}input[type=range]{padding-inline:0;accent-color:var(--color-primary)}.action-row{display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-top:.85rem}.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;min-height:2.8rem;border-radius:var(--radius-lg);border:1px solid transparent;padding:.75rem .85rem;font-weight:900;cursor:pointer}.btn:disabled{cursor:not-allowed;opacity:.48}.btn-primary{background:var(--color-primary);color:white;box-shadow:var(--shadow-sm)}.btn-secondary{background:var(--color-surface-soft);color:var(--color-text);border-color:var(--color-border)}.btn-secondary.is-active{border-color:var(--color-primary);background:var(--color-primary-soft)}.btn-ghost{background:transparent;color:var(--color-text-muted);border-color:var(--color-border)}@media (min-width:760px){.workspace{grid-template-columns:minmax(0,1.15fr) minmax(19rem,.85fr);align-items:start}.toolbar{position:sticky;top:5.5rem}.tool-grid-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}@media (max-width:520px){.tool-grid-actions{grid-template-columns:1fr}.action-row{grid-template-columns:1fr}}
 </style>
