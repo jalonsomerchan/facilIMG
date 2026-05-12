@@ -1,5 +1,4 @@
 ---
-import Container from './Container.astro';
 import { localeLabels, siteConfig, type Locale } from '../config/site';
 import { getAlternateLocales, getLocalizedPath, useTranslations } from '../i18n/ui';
 
@@ -13,43 +12,82 @@ const homeUrl = getLocalizedPath('/', locale);
 const alternateLocales = getAlternateLocales(locale);
 ---
 
-<header class="site-header">
-  <Container class="flex items-center justify-between gap-4 py-4">
-    <a class="flex items-center gap-3 font-black tracking-tight no-underline" href={homeUrl}>
-      <span class="logo-mark" aria-hidden="true">IMG</span>
-      <span>{siteConfig.name}</span>
+<header class="site-header" data-site-header>
+  <div class="site-header__inner">
+    <a class="brand" href={homeUrl} aria-label={siteConfig.name}>
+      <span class="brand__mark" aria-hidden="true">IMG</span>
+      <strong>{siteConfig.name}</strong>
     </a>
-    <nav aria-label="Navegación principal" class="flex items-center gap-3 text-sm">
-      <a class="nav-link hidden sm:inline-flex" href={homeUrl}>{t('nav.home')}</a>
-      <a class="nav-link hidden sm:inline-flex" href={`${homeUrl}#tools`}>{t('nav.tools')}</a>
-      <a class="nav-link hidden sm:inline-flex" href={`${homeUrl}#faq`}>{t('nav.faq')}</a>
-      <button class="theme-toggle" type="button" data-theme-toggle aria-label="Cambiar modo claro u oscuro">☾</button>
-      {alternateLocales.map((alternateLocale) => (
-        <a
-          class="rounded-full border border-[var(--color-border)] px-3 py-1 text-xs font-bold text-[var(--color-text-muted)] no-underline hover:text-[var(--color-text)]"
-          href={getLocalizedPath('/', alternateLocale)}
-          hreflang={alternateLocale}
-        >
-          {localeLabels[alternateLocale]}
-        </a>
-      ))}
-    </nav>
-  </Container>
+
+    <button class="menu-toggle" type="button" data-menu-toggle aria-label="Abrir menú" aria-controls="site-menu" aria-expanded="false">
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+    </button>
+
+    <div class="header-right" id="site-menu" data-site-menu>
+      <nav class="primary-nav" aria-label="Navegación principal">
+        <a href={homeUrl}>{t('nav.home')}</a>
+        <a href={`${homeUrl}#editor`}>{t('home.primaryCta')}</a>
+        <a href={`${homeUrl}#tools`}>{t('nav.tools')}</a>
+        <a href={`${homeUrl}#faq`}>{t('nav.faq')}</a>
+      </nav>
+
+      <div class="site-actions">
+        <button class="theme-toggle" type="button" data-theme-toggle aria-label="Cambiar modo claro u oscuro">
+          <span class="theme-toggle__icon" data-theme-toggle-icon aria-hidden="true">☀️</span>
+          <span class="theme-toggle__text" data-theme-toggle-text>Tema</span>
+        </button>
+
+        <nav class="language-nav" aria-label="Selector de idioma">
+          <span class="language-nav__current">{locale.toUpperCase()}</span>
+          {alternateLocales.map((alternateLocale) => (
+            <a href={getLocalizedPath('/', alternateLocale)} hreflang={alternateLocale}>
+              {localeLabels[alternateLocale].slice(0, 2).toUpperCase()}
+            </a>
+          ))}
+        </nav>
+      </div>
+    </div>
+  </div>
 </header>
 
 <script is:inline>
   (() => {
-    const button = document.querySelector('[data-theme-toggle]');
-    if (!button) return;
-    const sync = () => {
-      button.textContent = document.documentElement.dataset.theme === 'dark' ? '☀' : '☾';
+    const header = document.querySelector('[data-site-header]');
+    const menuButton = document.querySelector('[data-menu-toggle]');
+    const menu = document.querySelector('[data-site-menu]');
+    const themeButton = document.querySelector('[data-theme-toggle]');
+    const themeIcon = document.querySelector('[data-theme-toggle-icon]');
+    const themeText = document.querySelector('[data-theme-toggle-text]');
+
+    const closeMenu = () => {
+      header?.classList.remove('is-menu-open');
+      menuButton?.setAttribute('aria-expanded', 'false');
     };
-    sync();
-    button.addEventListener('click', () => {
+
+    menuButton?.addEventListener('click', () => {
+      const isOpen = header?.classList.toggle('is-menu-open');
+      menuButton.setAttribute('aria-expanded', String(Boolean(isOpen)));
+    });
+
+    menu?.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeMenu));
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeMenu(); });
+
+    const syncTheme = () => {
+      const isDark = document.documentElement.dataset.theme === 'dark';
+      if (themeIcon) themeIcon.textContent = isDark ? '🌙' : '☀️';
+      if (themeText) themeText.textContent = isDark ? 'Oscuro' : 'Claro';
+      themeButton?.setAttribute('aria-pressed', String(isDark));
+    };
+
+    syncTheme();
+    themeButton?.addEventListener('click', () => {
       const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
       document.documentElement.dataset.theme = next;
       localStorage.setItem('theme', next);
-      sync();
+      syncTheme();
+      closeMenu();
     });
   })();
 </script>
