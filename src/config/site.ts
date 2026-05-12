@@ -17,6 +17,7 @@ export const siteConfig = {
   author: 'Jorge Alonso',
   defaultLocale,
   locales,
+  version: '2026-05-12-visual-editor-v4',
 };
 
 export type SiteConfig = typeof siteConfig;
