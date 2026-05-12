@@ -42,6 +42,7 @@
   "editor.visualTools": "Herramientas visuales",
   "editor.visualToolsHelp": "Redimensiona arrastrando las esquinas de la imagen. Para recortar, activa el recorte y mueve o ajusta la caja sobre la vista previa.",
   "editor.visualHint": "Arrastra los tiradores azules de las esquinas para redimensionar visualmente.",
+  "editor.cropHint": "Mueve la caja de recorte o arrastra sus esquinas. Después pulsa aplicar recorte.",
   "editor.resizeHandle": "Redimensionar imagen arrastrando",
   "editor.cropHandle": "Ajustar recorte arrastrando",
   "editor.crop": "Recortar visualmente",
